@@ -1,6 +1,6 @@
 # tipubsub
 
-a small demo using TiDB a message queue, providing Sub/Pub API at sacle.
+a small demo using TiDB as a message queue, providing Sub/Pub API at sacle.
 
 Usage:
 
