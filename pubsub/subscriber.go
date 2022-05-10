@@ -9,41 +9,42 @@ import (
 type Subscriber struct {
 	streamName string
 	recv       chan []Message
+	cfg        *Config
+	store      Store
 
 	lastSeen int64
 	offset   int64
-	store    Store
 
-	maxBatchSize int
-	pollInterval time.Duration
+	maxBatchSize     int
+	pollIntervalInMs int
 }
 
-func NewSubscriber(streamName string, lastSeen int64, maxBatchSize int, pollInterval time.Duration) *Subscriber {
-	if _store == nil {
-		panic("store not initialized")
+func NewSubscriber(cfg *Config, streamName string, offset int64) (*Subscriber, error) {
+	s, err := OpenStore(cfg.DSN)
+	if err != nil {
+		return nil, err
 	}
-
-	if maxBatchSize <= 0 {
-		maxBatchSize = 100
+	if offset == 0 {
+		// TODO: use last seen from store
+		offset, err = s.MaxTs(streamName)
+		if err != nil {
+			// should not be here
+			return nil, err
+		}
 	}
-
-	if pollInterval <= 0 {
-		pollInterval = 100 * time.Microsecond
-	}
-
 	return &Subscriber{
-		streamName:   streamName,
-		recv:         make(chan []Message),
-		store:        _store,
-		lastSeen:     lastSeen,
-		maxBatchSize: maxBatchSize,
-		pollInterval: pollInterval,
-	}
+		streamName:       streamName,
+		cfg:              cfg,
+		recv:             make(chan []Message),
+		store:            s,
+		lastSeen:         offset,
+		maxBatchSize:     cfg.MaxBatchSize,
+		pollIntervalInMs: cfg.PollIntervalInMs,
+	}, nil
 }
 
-func (s *Subscriber) Open() error {
+func (s *Subscriber) Open() {
 	go s.pollWorker()
-	return nil
 }
 
 func (s *Subscriber) Receive() <-chan []Message {
@@ -51,21 +52,12 @@ func (s *Subscriber) Receive() <-chan []Message {
 }
 
 func (s *Subscriber) pollWorker() {
-	var err error
-	if s.lastSeen == 0 {
-		// TODO: use last seen from store
-		s.lastSeen, err = s.store.MaxTs(s.streamName)
-		if err != nil {
-			// should not be here
-			log.Fatal(err)
-		}
-	}
-	log.Info("Start polling from", s.streamName, " ", s.lastSeen)
+	log.Info("sub: start polling from", s.streamName, "@", s.lastSeen)
 	for {
 		msgs, max, err := s.store.FetchMessages(s.streamName, s.lastSeen, s.maxBatchSize)
 		if err != nil {
 			log.Error(err)
-			time.Sleep(5 * s.pollInterval)
+			time.Sleep(time.Duration(s.pollIntervalInMs) * time.Millisecond)
 			goto done
 		}
 		if len(msgs) > 0 {
@@ -73,7 +65,7 @@ func (s *Subscriber) pollWorker() {
 			s.recv <- msgs
 		}
 	done:
-		time.Sleep(s.pollInterval)
+		time.Sleep(time.Duration(s.pollIntervalInMs) * time.Millisecond)
 	}
 
 }

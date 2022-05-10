@@ -1,19 +1,25 @@
 package main
 
 import (
-	"time"
+	"flag"
 	"tipubsub/pubsub"
 
 	"github.com/c4pt0r/log"
 )
 
-func main() {
-	err := pubsub.OpenStore("root:@tcp(localhost:4000)/test")
-	if err != nil {
-		panic(err)
-	}
+var (
+	configFile = flag.String("c", "config.toml", "config file")
+)
 
-	subscriber := pubsub.NewSubscriber("test", 0, 100, 500*time.Millisecond)
+func main() {
+	flag.Parse()
+	cfg := pubsub.MustLoadConfig(*configFile)
+	log.Info("config:", cfg)
+
+	subscriber, err := pubsub.NewSubscriber(cfg, "test_stream", 0)
+	if err != nil {
+		log.Fatal(err)
+	}
 	subscriber.Open()
 
 	ch := subscriber.Receive()

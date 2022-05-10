@@ -33,17 +33,17 @@ func (s *Stream) Name() string {
 	return s.name
 }
 
-func NewStream(name string, maxBatchSize int) *Stream {
-	if _store == nil {
-		panic("Store not initialized")
-		return nil
+func NewStream(cfg *Config, name string) (*Stream, error) {
+	s, err := OpenStore(cfg.DSN)
+	if err != nil {
+		return nil, err
 	}
 	return &Stream{
 		name:         name,
-		mq:           make(chan Message, maxBatchSize),
-		store:        _store,
-		maxBatchSize: maxBatchSize,
-	}
+		mq:           make(chan Message, cfg.MaxBatchSize),
+		store:        s,
+		maxBatchSize: cfg.MaxBatchSize,
+	}, nil
 }
 
 func (s *Stream) Open() error {
@@ -51,7 +51,7 @@ func (s *Stream) Open() error {
 	if err != nil {
 		return err
 	}
-	log.Info("PubSub: Open Stream: ", s.name)
+	log.Info("pub: open stream:", s.name)
 	go s.pubWorker()
 	return nil
 }
@@ -98,7 +98,7 @@ func (s *Stream) getBatches(maxItems int, maxTimeout time.Duration) chan []Messa
 }
 
 func (s *Stream) pubWorker() {
-	log.Info("PubSub: Starting pub worker...")
+	log.Info("pub: Starting pub worker...")
 	batches := s.getBatches(s.maxBatchSize, pullTimeout)
 	for batch := range batches {
 		// Put batch to store

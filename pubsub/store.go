@@ -20,12 +20,13 @@ type Store interface {
 	MetaWatch(key string, ch chan<- []byte) error
 }
 
-var _store Store
-
-func OpenStore(dsn string) error {
+func OpenStore(dsn string) (Store, error) {
 	// TODO only support TiDB now
-	_store = NewTiDBStore(dsn)
-	return _store.Init()
+	s := NewTiDBStore(dsn)
+	if err := s.Init(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 type TiDBStore struct {
