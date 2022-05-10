@@ -6,6 +6,10 @@ import (
 	"github.com/c4pt0r/log"
 )
 
+var (
+	LatestTs = int64(-1)
+)
+
 type Subscriber struct {
 	streamName string
 	recv       chan []Message
@@ -24,11 +28,9 @@ func NewSubscriber(cfg *Config, streamName string, offset int64) (*Subscriber, e
 	if err != nil {
 		return nil, err
 	}
-	if offset == 0 {
-		// TODO: use last seen from store
+	if offset == LatestTs {
 		offset, err = s.MaxTs(streamName)
 		if err != nil {
-			// should not be here
 			return nil, err
 		}
 	}
@@ -67,5 +69,4 @@ func (s *Subscriber) pollWorker() {
 	done:
 		time.Sleep(time.Duration(s.pollIntervalInMs) * time.Millisecond)
 	}
-
 }

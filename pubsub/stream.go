@@ -8,13 +8,13 @@ import (
 )
 
 type Message struct {
+	ID   int64 // auto generated
 	Ts   int64
-	ID   string
 	Data []byte
 }
 
 func (m Message) String() string {
-	return fmt.Sprintf("Message{ID: %s, Ts: %d, Data: %s}", m.ID, m.Ts, string(m.Data))
+	return fmt.Sprintf("Message{ID: %d, Ts: %d, Data: %s}", m.ID, m.Ts, string(m.Data))
 }
 
 type Stream struct {

@@ -16,12 +16,12 @@ func main() {
 	cfg := pubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
-	subscriber, err := pubsub.NewSubscriber(cfg, "test_stream", 0)
+	subscriber, err := pubsub.NewSubscriber(cfg, "test_stream", pubsub.LatestTs)
 	if err != nil {
 		log.Fatal(err)
 	}
-	subscriber.Open()
 
+	subscriber.Open()
 	ch := subscriber.Receive()
 	for messages := range ch {
 		for _, message := range messages {

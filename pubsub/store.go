@@ -45,10 +45,12 @@ func NewTiDBStore(dsn string) *TiDBStore {
 }
 
 func (s *TiDBStore) CreateStream(streamName string) error {
+	// TODO: Use partition
 	stmt := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			id BIGINT AUTO_RANDOM,
 			ts BIGINT,
+			create_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			data TEXT,
 			PRIMARY KEY (id),
 			KEY(ts)
@@ -104,6 +106,7 @@ func (s *TiDBStore) PutMessages(streamName string, messages []Message) error {
 func (s *TiDBStore) FetchMessages(streamName string, ts int64, limit int) ([]Message, int64, error) {
 	stmt := fmt.Sprintf(`
 		SELECT
+			id,
 			ts,
 			data
 		FROM %s
@@ -118,13 +121,15 @@ func (s *TiDBStore) FetchMessages(streamName string, ts int64, limit int) ([]Mes
 	var messages []Message
 	var maxTs int64 = 0
 	for rows.Next() {
+		var id int64
 		var ts int64
 		var data []byte
-		err := rows.Scan(&ts, &data)
+		err := rows.Scan(&id, &ts, &data)
 		if err != nil {
 			return nil, 0, err
 		}
 		messages = append(messages, Message{
+			ID:   id,
 			Ts:   ts,
 			Data: data,
 		})
