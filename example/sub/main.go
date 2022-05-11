@@ -16,7 +16,7 @@ func main() {
 	cfg := pubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
-	subscriber, err := pubsub.NewSubscriber(cfg, "test_stream", pubsub.LatestTs)
+	subscriber, err := pubsub.NewSubscriber(cfg, "test_stream", pubsub.LatestId)
 	if err != nil {
 		log.Fatal(err)
 	}

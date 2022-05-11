@@ -10,9 +10,9 @@ import (
 type Store interface {
 	Init() error
 	CreateStream(streamName string) error
-	PutMessages(streamName string, messages []Message) error
+	PutMessages(streamName string, messages []*Message) error
 	FetchMessages(streamName string, ts int64, limit int) ([]Message, int64, error)
-	MaxTs(streamName string) (int64, error)
+	MaxID(streamName string) (int64, error)
 
 	MetaPut(key string, value []byte) error
 	MetaGet(key string) ([]byte, error)
@@ -48,7 +48,7 @@ func (s *TiDBStore) CreateStream(streamName string) error {
 	// TODO: Use partition
 	stmt := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
-			id BIGINT AUTO_RANDOM,
+			id BIGINT AUTO_INCREMENT,
 			ts BIGINT,
 			create_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			data TEXT,
@@ -75,7 +75,7 @@ func (s *TiDBStore) Init() error {
 	return nil
 }
 
-func (s *TiDBStore) PutMessages(streamName string, messages []Message) error {
+func (s *TiDBStore) PutMessages(streamName string, messages []*Message) error {
 	txn, err := s.db.Begin()
 	defer txn.Rollback()
 	if err != nil {
@@ -91,10 +91,15 @@ func (s *TiDBStore) PutMessages(streamName string, messages []Message) error {
 			?,
 			?
 		)`, s.getStreamTblName(streamName))
-		_, err := txn.Exec(sql, msg.Ts, msg.Data)
+		res, err := txn.Exec(sql, msg.Ts, msg.Data)
 		if err != nil {
 			return err
 		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		msg.ID = id
 	}
 	err = txn.Commit()
 	if err != nil {
@@ -103,23 +108,23 @@ func (s *TiDBStore) PutMessages(streamName string, messages []Message) error {
 	return nil
 }
 
-func (s *TiDBStore) FetchMessages(streamName string, ts int64, limit int) ([]Message, int64, error) {
+func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) ([]Message, int64, error) {
 	stmt := fmt.Sprintf(`
 		SELECT
 			id,
 			ts,
 			data
 		FROM %s
-		WHERE ts > ?
+		WHERE id > ?
 		LIMIT %d`, s.getStreamTblName(streamName), limit)
 
-	rows, err := s.db.Query(stmt, ts)
+	rows, err := s.db.Query(stmt, idOffset)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer rows.Close()
 	var messages []Message
-	var maxTs int64 = 0
+	var maxId int64 = 0
 	for rows.Next() {
 		var id int64
 		var ts int64
@@ -133,24 +138,24 @@ func (s *TiDBStore) FetchMessages(streamName string, ts int64, limit int) ([]Mes
 			Ts:   ts,
 			Data: data,
 		})
-		if ts > maxTs {
-			maxTs = ts
+		if id > maxId {
+			maxId = id
 		}
 	}
-	return messages, maxTs, nil
+	return messages, maxId, nil
 }
 
-func (s *TiDBStore) MaxTs(streamName string) (int64, error) {
+func (s *TiDBStore) MaxID(streamName string) (int64, error) {
 	stmt := fmt.Sprintf(`
 		SELECT
-			MAX(ts)
+			MAX(id)
 		FROM %s`, s.getStreamTblName(streamName))
-	var maxTs int64
-	err := s.db.QueryRow(stmt).Scan(&maxTs)
+	var maxId int64
+	err := s.db.QueryRow(stmt).Scan(&maxId)
 	if err != nil {
 		return 0, err
 	}
-	return maxTs, nil
+	return maxId, nil
 }
 
 func (s *TiDBStore) MetaPut(key string, value []byte) error {

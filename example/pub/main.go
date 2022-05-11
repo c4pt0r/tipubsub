@@ -28,7 +28,7 @@ func main() {
 	}
 
 	for i := 0; i < 500; i++ {
-		stream.Publish(pubsub.Message{
+		stream.Publish(&pubsub.Message{
 			Data: []byte(fmt.Sprintf("Message: %d", i)),
 		})
 	}

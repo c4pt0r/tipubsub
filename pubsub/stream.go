@@ -19,7 +19,7 @@ func (m Message) String() string {
 
 type Stream struct {
 	name string
-	mq   chan Message
+	mq   chan *Message
 
 	store        Store
 	maxBatchSize int
@@ -40,7 +40,7 @@ func NewStream(cfg *Config, name string) (*Stream, error) {
 	}
 	return &Stream{
 		name:         name,
-		mq:           make(chan Message, cfg.MaxBatchSize),
+		mq:           make(chan *Message, cfg.MaxBatchSize),
 		store:        s,
 		maxBatchSize: cfg.MaxBatchSize,
 	}, nil
@@ -56,7 +56,7 @@ func (s *Stream) Open() error {
 	return nil
 }
 
-func (s *Stream) Publish(m Message) int64 {
+func (s *Stream) Publish(m *Message) int64 {
 	if m.Ts == 0 {
 		m.Ts = time.Now().UnixNano()
 	}
@@ -64,12 +64,12 @@ func (s *Stream) Publish(m Message) int64 {
 	return m.Ts
 }
 
-func (s *Stream) getBatches(maxItems int, maxTimeout time.Duration) chan []Message {
-	batches := make(chan []Message)
+func (s *Stream) getBatches(maxItems int, maxTimeout time.Duration) chan []*Message {
+	batches := make(chan []*Message)
 	go func() {
 		defer close(batches)
 		for keepGoing := true; keepGoing; {
-			var batch []Message
+			var batch []*Message
 			expire := time.After(maxTimeout)
 			for {
 				select {
