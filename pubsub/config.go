@@ -30,6 +30,7 @@ func (c *Config) String() string {
 	return fmt.Sprintf("%+v", *c)
 }
 
+// LoadConfig loads config from file.
 func LoadConfig(path string) (*Config, error) {
 	var cfg Config
 	// read configuration from the file and environment variables
@@ -44,6 +45,7 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// LoadConfigFromEnv loads config from environment variables.
 func MustLoadConfig(path string) *Config {
 	cfg, err := LoadConfig(path)
 	if err != nil {

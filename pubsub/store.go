@@ -22,12 +22,18 @@ import (
 )
 
 type Store interface {
+	// Init initializes the store, call it after creating the store
 	Init() error
+	// CreateStream creates a stream
 	CreateStream(streamName string) error
+	// PutMessages puts messages into a stream
 	PutMessages(streamName string, messages []*Message) error
+	// FetchMessages fetches messages from a stream
 	FetchMessages(streamName string, ts int64, limit int) ([]Message, int64, error)
+	// MaxID returns the max offset of a stream
 	MaxID(streamName string) (int64, error)
 
+	// TODO
 	MetaPut(key string, value []byte) error
 	MetaGet(key string) ([]byte, error)
 	MetaDelete(key string) error
@@ -60,6 +66,7 @@ func NewTiDBStore(dsn string) *TiDBStore {
 
 func (s *TiDBStore) CreateStream(streamName string) error {
 	// TODO: Use partition
+	// stream is a table in the database
 	stmt := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			id BIGINT AUTO_INCREMENT,
@@ -70,10 +77,6 @@ func (s *TiDBStore) CreateStream(streamName string) error {
 			KEY(ts)
 		);`, s.getStreamTblName(streamName))
 	_, err := s.db.Exec(stmt)
-	if err != nil {
-		return err
-	}
-	_, err = s.db.Exec(stmt)
 	if err != nil {
 		return err
 	}
@@ -90,6 +93,9 @@ func (s *TiDBStore) Init() error {
 }
 
 func (s *TiDBStore) PutMessages(streamName string, messages []*Message) error {
+	// a message is a row in the table, so we need to use a transaction
+	// because auto_increment is used, we don't need to set id
+	// use id as the offset
 	txn, err := s.db.Begin()
 	defer txn.Rollback()
 	if err != nil {

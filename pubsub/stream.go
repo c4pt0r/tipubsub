@@ -79,6 +79,7 @@ func (s *Stream) Publish(m *Message) int64 {
 }
 
 func (s *Stream) getBatches(maxItems int, maxTimeout time.Duration) chan []*Message {
+	// Create a channel to receive batches
 	batches := make(chan []*Message)
 	go func() {
 		defer close(batches)
@@ -94,10 +95,11 @@ func (s *Stream) getBatches(maxItems int, maxTimeout time.Duration) chan []*Mess
 					}
 
 					batch = append(batch, value)
+					// if batch is full, return batch
 					if len(batch) == maxItems {
 						goto done
 					}
-
+				// if channel is empty, block for maxTimeout
 				case <-expire:
 					goto done
 				}
@@ -118,7 +120,7 @@ func (s *Stream) pubWorker() {
 		// Put batch to store
 		err := s.store.PutMessages(s.name, batch)
 		if err != nil {
-			// Retry?
+			// TODO: Retry?
 			log.Error(err)
 		}
 	}
