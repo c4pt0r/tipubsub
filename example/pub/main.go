@@ -25,6 +25,7 @@ import (
 
 var (
 	configFile = flag.String("c", "config.toml", "config file")
+	streamName = flag.String("s", "test_stream", "stream name")
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 	cfg := pubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
-	stream, err := pubsub.NewStream(cfg, "test_stream")
+	stream, err := pubsub.NewStream(cfg, *streamName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,11 +42,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for i := 0; i < 500; i++ {
-		stream.Publish(&pubsub.Message{
-			Data: []byte(fmt.Sprintf("Message: %d", i)),
-		})
+	for {
+		for i := 0; i < 10; i++ {
+			stream.Publish(&pubsub.Message{
+				Data: []byte(fmt.Sprintf("Message: %d", i)),
+			})
+		}
+		time.Sleep(1 * time.Second)
 	}
-
-	time.Sleep(5 * time.Second)
 }

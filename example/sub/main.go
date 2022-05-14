@@ -19,27 +19,43 @@ import (
 	"tipubsub/pubsub"
 
 	"github.com/c4pt0r/log"
+	"github.com/fatih/color"
 )
 
 var (
 	configFile = flag.String("c", "config.toml", "config file")
+	streamName = flag.String("s", "test_stream", "stream name")
 )
+
+type MySubscriber struct {
+}
+
+var _ pubsub.Subscriber = (*MySubscriber)(nil)
+
+func (s *MySubscriber) OnMessages(streamName string, msgs []pubsub.Message) {
+	log.I("received messages:", color.YellowString(streamName), msgs)
+}
+
+func (s *MySubscriber) Id() string {
+	return "test_subscriber"
+}
 
 func main() {
 	flag.Parse()
 	cfg := pubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
-	subscriber, err := pubsub.NewSubscriber(cfg, "test_stream", pubsub.LatestId)
+	sub := &MySubscriber{}
+	hub, err := pubsub.NewHub(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	subscriber.Open()
-	ch := subscriber.Receive()
-	for messages := range ch {
-		for _, message := range messages {
-			log.I(message)
-		}
+	err = hub.Subscribe(*streamName, sub)
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	<-make(chan struct{})
+
 }
