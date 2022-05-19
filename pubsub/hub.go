@@ -16,6 +16,7 @@ package pubsub
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/c4pt0r/log"
@@ -28,8 +29,12 @@ type PollWorker struct {
 	maxBatchSize     int
 	store            Store
 	pollIntervalInMs int
+	stopped          atomic.Value
+	numSubscribers   int32
 
-	subscribers sync.Map
+	// make sure subscribers is threadsafe here
+	mu          sync.Mutex
+	subscribers map[string]Subscriber
 }
 
 func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*PollWorker, error) {
@@ -40,23 +45,48 @@ func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*Poll
 			return nil, err
 		}
 	}
-	return &PollWorker{
+	stopped := atomic.Value{}
+	stopped.Store(false)
+
+	pw := &PollWorker{
 		streamName:       streamName,
 		lastSeenOffset:   offset,
 		maxBatchSize:     cfg.MaxBatchSize,
 		store:            s,
+		stopped:          stopped,
+		numSubscribers:   0,
+		mu:               sync.Mutex{},
 		pollIntervalInMs: cfg.PollIntervalInMs, // FIXME: use config
-		subscribers:      sync.Map{},
-	}, nil
+		subscribers:      map[string]Subscriber{},
+	}
+	go pw.run()
+	return pw, nil
 }
 
 func (pw *PollWorker) addNewSubscriber(subscriber Subscriber) {
-	pw.subscribers.Store(subscriber.Id(), subscriber)
+	pw.mu.Lock()
+	defer pw.mu.Unlock()
+	log.I("pollWorkers", pw.streamName, "got new subscriber:", subscriber.Id())
+	pw.subscribers[subscriber.Id()] = subscriber
+	atomic.AddInt32(&pw.numSubscribers, 1)
+}
+
+func (pw *PollWorker) removeSubscriber(subscriber Subscriber) {
+	pw.mu.Lock()
+	defer pw.mu.Unlock()
+	log.I("pollWorkers", pw.streamName, "remove subscriber:", subscriber.Id())
+	delete(pw.subscribers, subscriber.Id())
+	atomic.AddInt32(&pw.numSubscribers, -1)
+}
+
+func (pw *PollWorker) Stop() {
+	log.I("pollWorkers", pw.streamName, "stopped")
+	pw.stopped.Store(true)
 }
 
 func (pw *PollWorker) run() {
-	log.Info("sub: start polling from", pw.streamName, "@ id=", pw.lastSeenOffset)
-	for {
+	log.Info("sub: start polling from", pw.streamName, "@id=", pw.lastSeenOffset)
+	for !pw.stopped.Load().(bool) {
 		msgs, max, err := pw.store.FetchMessages(pw.streamName, pw.lastSeenOffset, pw.maxBatchSize)
 		if err != nil {
 			log.Error(err)
@@ -66,19 +96,23 @@ func (pw *PollWorker) run() {
 		if len(msgs) > 0 {
 			pw.lastSeenOffset = max
 			log.Info("sub: got", len(msgs), "messages from", pw.streamName, "@ id=", pw.lastSeenOffset)
-			pw.subscribers.Range(func(key, value interface{}) bool {
+
+			pw.mu.Lock()
+			for _, value := range pw.subscribers {
 				subscriber := value.(Subscriber)
 				log.Info("fanout to", subscriber.Id())
 				subscriber.OnMessages(pw.streamName, msgs)
-				return true
-			})
+			}
+			pw.mu.Unlock()
 		}
 	done:
 		time.Sleep(time.Duration(pw.pollIntervalInMs) * time.Millisecond)
 	}
+	log.D("poll worker stopped")
 }
 
 type Hub struct {
+	mu          sync.Mutex
 	pollWorkers map[string]*PollWorker
 	store       Store
 	cfg         *Config
@@ -90,25 +124,33 @@ func NewHub(c *Config) (*Hub, error) {
 		return nil, err
 	}
 	return &Hub{
-		cfg:   c,
-		store: store,
+		mu:          sync.Mutex{},
+		cfg:         c,
+		store:       store,
+		pollWorkers: map[string]*PollWorker{},
 	}, nil
 }
 
-func (m *Hub) Subscribe(streamName string, subscriber Subscriber) error {
-	if m.pollWorkers == nil {
-		m.pollWorkers = map[string]*PollWorker{}
-	}
+func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offsetID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	// if the stream is not in the map, create a new poll worker for this stream
 	if _, ok := m.pollWorkers[streamName]; !ok {
 		// create a new poll worker for this stream
-		pw, err := newPollWorker(m.cfg, m.store, streamName, LatestId)
+		pw, err := newPollWorker(m.cfg, m.store, streamName, offsetID)
 		if err != nil {
 			return err
 		}
 		m.pollWorkers[streamName] = pw
-		go pw.run()
 	}
 	m.pollWorkers[streamName].addNewSubscriber(subscriber)
 	return nil
+}
+
+func (m *Hub) Unsubscribe(streamName string, subscriber Subscriber) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if pw, ok := m.pollWorkers[streamName]; ok {
+		pw.removeSubscriber(subscriber)
+	}
 }

@@ -32,12 +32,6 @@ type Store interface {
 	FetchMessages(streamName string, ts int64, limit int) ([]Message, int64, error)
 	// MaxID returns the max offset of a stream
 	MaxID(streamName string) (int64, error)
-
-	// TODO
-	MetaPut(key string, value []byte) error
-	MetaGet(key string) ([]byte, error)
-	MetaDelete(key string) error
-	MetaWatch(key string, ch chan<- []byte) error
 }
 
 func OpenStore(dsn string) (Store, error) {
@@ -54,8 +48,12 @@ type TiDBStore struct {
 	db  *sql.DB
 }
 
-func (s *TiDBStore) getStreamTblName(streamName string) string {
+func getStreamTblName(streamName string) string {
 	return fmt.Sprintf("tipubsub_stream_%s", streamName)
+}
+
+func (s *TiDBStore) getMetaTblName(streamName string) string {
+	return fmt.Sprintf("tipubsub_meta_%s", streamName)
 }
 
 func NewTiDBStore(dsn string) *TiDBStore {
@@ -75,7 +73,7 @@ func (s *TiDBStore) CreateStream(streamName string) error {
 			data TEXT,
 			PRIMARY KEY (id),
 			KEY(ts)
-		);`, s.getStreamTblName(streamName))
+		);`, getStreamTblName(streamName))
 	_, err := s.db.Exec(stmt)
 	if err != nil {
 		return err
@@ -110,7 +108,7 @@ func (s *TiDBStore) PutMessages(streamName string, messages []*Message) error {
 		) VALUES (
 			?,
 			?
-		)`, s.getStreamTblName(streamName))
+		)`, getStreamTblName(streamName))
 		res, err := txn.Exec(sql, msg.Ts, msg.Data)
 		if err != nil {
 			return err
@@ -136,7 +134,7 @@ func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) 
 			data
 		FROM %s
 		WHERE id > ?
-		LIMIT %d`, s.getStreamTblName(streamName), limit)
+		LIMIT %d`, getStreamTblName(streamName), limit)
 
 	rows, err := s.db.Query(stmt, idOffset)
 	if err != nil {
@@ -169,27 +167,11 @@ func (s *TiDBStore) MaxID(streamName string) (int64, error) {
 	stmt := fmt.Sprintf(`
 		SELECT
 			MAX(id)
-		FROM %s`, s.getStreamTblName(streamName))
+		FROM %s`, getStreamTblName(streamName))
 	var maxId int64
 	err := s.db.QueryRow(stmt).Scan(&maxId)
 	if err != nil {
 		return 0, err
 	}
 	return maxId, nil
-}
-
-func (s *TiDBStore) MetaPut(key string, value []byte) error {
-	return nil
-}
-
-func (s *TiDBStore) MetaGet(key string) ([]byte, error) {
-	return nil, nil
-}
-
-func (s *TiDBStore) MetaDelete(key string) error {
-	return nil
-}
-
-func (s *TiDBStore) MetaWatch(key string, ch chan<- []byte) error {
-	return nil
 }

@@ -24,6 +24,7 @@ type Config struct {
 	DSN              string `toml:"dsn" env:"DSN" env-default:"root:@tcp(localhost:4000)/test"`
 	MaxBatchSize     int    `toml:"max_batch_size" env:"MAX_BATCH_SIZE" env-default:"100"`
 	PollIntervalInMs int    `toml:"poll_interval_in_ms" env:"POLL_INTERVAL_IN_MS" env-default:"100"`
+	GCIntervalInSec  int    `toml:"gc_interval_in_sec" env:"GC_INTERVAL_IN_SEC" env-default:"10"`
 }
 
 func (c *Config) String() string {

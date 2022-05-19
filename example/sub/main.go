@@ -16,14 +16,15 @@ package main
 
 import (
 	"flag"
+	"strconv"
 	"tipubsub/pubsub"
 
 	"github.com/c4pt0r/log"
-	"github.com/fatih/color"
 )
 
 var (
 	configFile = flag.String("c", "config.toml", "config file")
+	offsetID   = flag.String("offset", "HEAD", "offset")
 	streamName = flag.String("s", "test_stream", "stream name")
 )
 
@@ -33,7 +34,9 @@ type MySubscriber struct {
 var _ pubsub.Subscriber = (*MySubscriber)(nil)
 
 func (s *MySubscriber) OnMessages(streamName string, msgs []pubsub.Message) {
-	log.I("received messages:", color.YellowString(streamName), msgs)
+	for _, msg := range msgs {
+		log.I("Got Message:", msg, msg.ID)
+	}
 }
 
 func (s *MySubscriber) Id() string {
@@ -45,13 +48,24 @@ func main() {
 	cfg := pubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
+	var offset int64
+	var err error
+	if *offsetID == "HEAD" {
+		offset = pubsub.LatestId
+	} else {
+		offset, err = strconv.ParseInt(*offsetID, 10, 64)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	sub := &MySubscriber{}
 	hub, err := pubsub.NewHub(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = hub.Subscribe(*streamName, sub)
+	err = hub.Subscribe(*streamName, sub, offset)
 	if err != nil {
 		log.Fatal(err)
 	}
