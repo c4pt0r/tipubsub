@@ -17,8 +17,6 @@ package pubsub
 import (
 	"database/sql"
 	"fmt"
-
-	"github.com/c4pt0r/log"
 )
 
 const (
@@ -27,11 +25,16 @@ const (
 )
 
 type gcWorker struct {
-	streamName string
-	db         *sql.DB
+	db *sql.DB
 }
 
-func (gc *gcWorker) getSafeOffsetID() (int64, error) {
+func newGCWorker(db *sql.DB) *gcWorker {
+	return &gcWorker{
+		db: db,
+	}
+}
+
+func (gc *gcWorker) getSafeOffsetID(streamName string) (int64, error) {
 	stmt := fmt.Sprintf(`
 			SELECT MIN(t.id) 
 			FROM (
@@ -41,10 +44,9 @@ func (gc *gcWorker) getSafeOffsetID() (int64, error) {
 					%s 
 				ORDER BY
 					id
-				DESC LIMIT %d) as t
-		`, getStreamTblName(gc.streamName), SAFE_AMOUNT)
-
-	log.D(stmt)
+				DESC LIMIT %d
+			) as t
+		`, getStreamTblName(streamName), SAFE_AMOUNT)
 
 	var safeOffsetID int64
 	err := gc.db.QueryRow(stmt).Scan(&safeOffsetID)
@@ -54,17 +56,14 @@ func (gc *gcWorker) getSafeOffsetID() (int64, error) {
 	return safeOffsetID, nil
 }
 
-func (gc *gcWorker) deleteUntil(offsetID int64) error {
+func (gc *gcWorker) deleteUntil(streamName string, offsetID int64) error {
 	stmt := fmt.Sprintf(`
 		DELETE FROM
 			%s
 		WHERE
 			id < ?
 		LIMIT 1000
-	`, getStreamTblName(gc.streamName)) // TODO: batch size
-
-	log.D(stmt)
-
+	`, getStreamTblName(streamName)) // TODO: batch size
 	for {
 		res, err := gc.db.Exec(stmt, offsetID)
 		if err != nil {
@@ -78,10 +77,10 @@ func (gc *gcWorker) deleteUntil(offsetID int64) error {
 	return nil
 }
 
-func (gc *gcWorker) safeGC() error {
-	safePoint, err := gc.getSafeOffsetID()
+func (gc *gcWorker) safeGC(streamName string) error {
+	safePoint, err := gc.getSafeOffsetID(streamName)
 	if err != nil {
 		return err
 	}
-	return gc.deleteUntil(safePoint)
+	return gc.deleteUntil(streamName, safePoint)
 }

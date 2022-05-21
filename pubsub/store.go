@@ -32,6 +32,8 @@ type Store interface {
 	FetchMessages(streamName string, ts int64, limit int) ([]Message, int64, error)
 	// MaxID returns the max offset of a stream
 	MaxID(streamName string) (int64, error)
+	// StartGC starts the garbage collection worker
+	GC(streamName string) error
 }
 
 func OpenStore(dsn string) (Store, error) {
@@ -46,6 +48,7 @@ func OpenStore(dsn string) (Store, error) {
 type TiDBStore struct {
 	dsn string
 	db  *sql.DB
+	gc  *gcWorker
 }
 
 func getStreamTblName(streamName string) string {
@@ -87,6 +90,7 @@ func (s *TiDBStore) Init() error {
 	if err != nil {
 		return err
 	}
+	s.gc = newGCWorker(s.db)
 	return nil
 }
 
@@ -173,4 +177,8 @@ func (s *TiDBStore) MaxID(streamName string) (int64, error) {
 		return 0, err
 	}
 	return maxId, nil
+}
+
+func (s *TiDBStore) GC(streamName string) error {
+	return s.gc.safeGC(streamName)
 }

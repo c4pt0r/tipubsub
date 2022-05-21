@@ -35,7 +35,7 @@ var _ pubsub.Subscriber = (*MySubscriber)(nil)
 
 func (s *MySubscriber) OnMessages(streamName string, msgs []pubsub.Message) {
 	for _, msg := range msgs {
-		log.I("Got Message:", msg, msg.ID)
+		log.E("Got Message:", msg, msg.ID)
 	}
 }
 
@@ -71,5 +71,4 @@ func main() {
 	}
 
 	<-make(chan struct{})
-
 }

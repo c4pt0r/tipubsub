@@ -117,7 +117,7 @@ func (pw *PollWorker) run() {
 }
 
 type Hub struct {
-	mu          sync.Mutex
+	mu          sync.RWMutex
 	pollWorkers map[string]*PollWorker
 	store       Store
 	// streamName -> Stream
@@ -130,13 +130,27 @@ func NewHub(c *Config) (*Hub, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Hub{
-		mu:          sync.Mutex{},
+	h := &Hub{
+		mu:          sync.RWMutex{},
 		cfg:         c,
 		store:       store,
 		pollWorkers: map[string]*PollWorker{},
 		streams:     map[string]*Stream{},
-	}, nil
+	}
+	go h.gc()
+	return h, nil
+}
+
+func (m *Hub) gc() {
+	for {
+		time.Sleep(time.Duration(m.cfg.GCIntervalInSec) * time.Second)
+		m.mu.RLock()
+		for streamName := range m.streams {
+			log.I("start GC", streamName)
+			m.store.GC(streamName)
+		}
+		m.mu.RUnlock()
+	}
 }
 
 func (m *Hub) Publish(streamName string, msg *Message) (int64, error) {
@@ -172,8 +186,8 @@ func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offsetID int64
 }
 
 func (m *Hub) Unsubscribe(streamName string, subscriber Subscriber) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if pw, ok := m.pollWorkers[streamName]; ok {
 		pw.removeSubscriber(subscriber)
 	}
