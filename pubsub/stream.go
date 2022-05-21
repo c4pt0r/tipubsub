@@ -47,15 +47,11 @@ func (s *Stream) Name() string {
 	return s.name
 }
 
-func NewStream(cfg *Config, name string) (*Stream, error) {
-	s, err := OpenStore(cfg.DSN)
-	if err != nil {
-		return nil, err
-	}
+func NewStream(cfg *Config, s Store, name string) (*Stream, error) {
 	return &Stream{
+		store:        s,
 		name:         name,
 		mq:           make(chan *Message, cfg.MaxBatchSize),
-		store:        s,
 		maxBatchSize: cfg.MaxBatchSize,
 	}, nil
 }
@@ -93,7 +89,6 @@ func (s *Stream) getBatches(maxItems int, maxTimeout time.Duration) chan []*Mess
 						keepGoing = false
 						goto done
 					}
-
 					batch = append(batch, value)
 					// if batch is full, return batch
 					if len(batch) == maxItems {

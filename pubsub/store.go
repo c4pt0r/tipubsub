@@ -99,7 +99,6 @@ func (s *TiDBStore) PutMessages(streamName string, messages []*Message) error {
 	if err != nil {
 		return err
 	}
-
 	for _, msg := range messages {
 		sql := fmt.Sprintf(`
 		INSERT INTO %s (

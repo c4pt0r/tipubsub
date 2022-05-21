@@ -120,7 +120,9 @@ type Hub struct {
 	mu          sync.Mutex
 	pollWorkers map[string]*PollWorker
 	store       Store
-	cfg         *Config
+	// streamName -> Stream
+	streams map[string]*Stream
+	cfg     *Config
 }
 
 func NewHub(c *Config) (*Hub, error) {
@@ -133,7 +135,24 @@ func NewHub(c *Config) (*Hub, error) {
 		cfg:         c,
 		store:       store,
 		pollWorkers: map[string]*PollWorker{},
+		streams:     map[string]*Stream{},
 	}, nil
+}
+
+func (m *Hub) Publish(streamName string, msg *Message) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.streams[streamName]; !ok {
+		stream, err := NewStream(m.cfg, m.store, streamName)
+		if err != nil {
+			return 0, err
+		}
+		if err := stream.Open(); err != nil {
+			return 0, err
+		}
+		m.streams[streamName] = stream
+	}
+	return m.streams[streamName].Publish(msg), nil
 }
 
 func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offsetID int64) error {

@@ -33,18 +33,14 @@ func main() {
 	cfg := pubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
-	stream, err := pubsub.NewStream(cfg, *streamName)
+	hub, err := pubsub.NewHub(cfg)
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err := stream.Open(); err != nil {
 		log.Fatal(err)
 	}
 
 	for {
 		for i := 0; i < 10000; i++ {
-			stream.Publish(&pubsub.Message{
+			hub.Publish("test_stream", &pubsub.Message{
 				Data: []byte(fmt.Sprintf("Message: %d", i)),
 			})
 		}
