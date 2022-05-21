@@ -58,17 +58,14 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-
 	sub := &MySubscriber{}
 	hub, err := pubsub.NewHub(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	err = hub.Subscribe(*streamName, sub, offset)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	<-make(chan struct{})
 }

@@ -37,7 +37,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	for {
 		for i := 0; i < 10000; i++ {
 			hub.Publish("test_stream", &pubsub.Message{
