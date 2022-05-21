@@ -30,7 +30,7 @@ func init() {
 	sysStat = new(Stat)
 }
 
-func Stat() *Stat {
+func GetStat() *Stat {
 	return sysStat
 }
 
