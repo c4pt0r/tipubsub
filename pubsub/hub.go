@@ -38,7 +38,12 @@ type PollWorker struct {
 }
 
 func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*PollWorker, error) {
-	var err error
+	// create stream table
+	err := s.CreateStream(streamName)
+	if err != nil {
+		return nil, err
+	}
+
 	if offset == LatestId {
 		offset, err = s.MaxID(streamName)
 		if err != nil {

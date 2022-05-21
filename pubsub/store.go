@@ -166,7 +166,7 @@ func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) 
 func (s *TiDBStore) MaxID(streamName string) (int64, error) {
 	stmt := fmt.Sprintf(`
 		SELECT
-			MAX(id)
+			IFNULL(MAX(id), 0)
 		FROM %s`, getStreamTblName(streamName))
 	var maxId int64
 	err := s.db.QueryRow(stmt).Scan(&maxId)
