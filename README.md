@@ -1,6 +1,6 @@
 # tipubsub
 
-a small demo using TiDB as a message queue, providing Sub/Pub API at sacle.
+A small library using TiDB providing Sub/Pub API at sacle.
 
 Subscriber:
 
@@ -49,6 +49,7 @@ func main() {
 			Data: []byte(fmt.Sprintf("Message: %d", i)),
 		})
 	}
+    ...
 }
 ```
 
