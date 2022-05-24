@@ -1,4 +1,4 @@
 dsn = "root:@tcp(localhost:4000)/test"
 max_batch_size = 100
 poll_interval_in_ms = 100
-gc_interval_in_sec = 1000
+gc_interval_in_sec = 600

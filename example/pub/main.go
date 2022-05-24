@@ -18,7 +18,8 @@ import (
 	"flag"
 	"fmt"
 	"time"
-	"tipubsub/pubsub"
+
+	"github.com/c4pt0r/tipubsub"
 
 	"github.com/c4pt0r/log"
 )
@@ -30,16 +31,16 @@ var (
 
 func main() {
 	flag.Parse()
-	cfg := pubsub.MustLoadConfig(*configFile)
+	cfg := tipubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
-	hub, err := pubsub.NewHub(cfg)
+	hub, err := tipubsub.NewHub(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	for {
 		for i := 0; i < 10000; i++ {
-			hub.Publish("test_stream", &pubsub.Message{
+			hub.Publish("test_stream", &tipubsub.Message{
 				Data: []byte(fmt.Sprintf("Message: %d", i)),
 			})
 		}

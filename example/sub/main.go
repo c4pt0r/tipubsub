@@ -17,7 +17,8 @@ package main
 import (
 	"flag"
 	"strconv"
-	"tipubsub/pubsub"
+
+	"github.com/c4pt0r/tipubsub"
 
 	"github.com/c4pt0r/log"
 )
@@ -31,9 +32,9 @@ var (
 type MySubscriber struct {
 }
 
-var _ pubsub.Subscriber = (*MySubscriber)(nil)
+var _ tipubsub.Subscriber = (*MySubscriber)(nil)
 
-func (s *MySubscriber) OnMessages(streamName string, msgs []pubsub.Message) {
+func (s *MySubscriber) OnMessages(streamName string, msgs []tipubsub.Message) {
 	for _, msg := range msgs {
 		log.E("Got Message:", msg, msg.ID)
 	}
@@ -45,13 +46,13 @@ func (s *MySubscriber) Id() string {
 
 func main() {
 	flag.Parse()
-	cfg := pubsub.MustLoadConfig(*configFile)
+	cfg := tipubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
 	var offset int64
 	var err error
 	if *offsetID == "HEAD" {
-		offset = pubsub.LatestId
+		offset = tipubsub.LatestId
 	} else {
 		offset, err = strconv.ParseInt(*offsetID, 10, 64)
 		if err != nil {
@@ -59,7 +60,7 @@ func main() {
 		}
 	}
 	sub := &MySubscriber{}
-	hub, err := pubsub.NewHub(cfg)
+	hub, err := tipubsub.NewHub(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
