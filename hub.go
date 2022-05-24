@@ -160,18 +160,21 @@ func (m *Hub) gc() {
 
 func (m *Hub) Publish(streamName string, msg *Message) (int64, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if _, ok := m.streams[streamName]; !ok {
 		stream, err := NewStream(m.cfg, m.store, streamName)
 		if err != nil {
+			m.mu.Unlock()
 			return 0, err
 		}
 		if err := stream.Open(); err != nil {
+			m.mu.Unlock()
 			return 0, err
 		}
 		m.streams[streamName] = stream
 	}
-	return m.streams[streamName].Publish(msg), nil
+	s := m.streams[streamName]
+	m.mu.Unlock()
+	return s.Publish(msg), nil
 }
 
 func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offsetID int64) error {
