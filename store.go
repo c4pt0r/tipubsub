@@ -68,6 +68,7 @@ func NewTiDBStore(dsn string) *TiDBStore {
 	}
 }
 
+// CreateStream creates a stream, every stream is a table in the database
 func (s *TiDBStore) CreateStream(streamName string) error {
 	// TODO: Use partition
 	// stream is a table in the database
@@ -178,6 +179,7 @@ func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) 
 }
 
 func (s *TiDBStore) MaxID(streamName string) (int64, error) {
+	// using isnull make sure when there is no message in the stream, not return NULL
 	stmt := fmt.Sprintf(`
 		SELECT
 			IFNULL(MAX(id), 0)

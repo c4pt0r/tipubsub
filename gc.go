@@ -34,6 +34,7 @@ func newGCWorker(db *sql.DB) *gcWorker {
 	}
 }
 
+// getSafeOffsetID returns the offsetID of the last message in the stream
 func (gc *gcWorker) getSafeOffsetID(streamName string) (int64, error) {
 	stmt := fmt.Sprintf(`
 			SELECT MIN(t.id) 
@@ -56,6 +57,7 @@ func (gc *gcWorker) getSafeOffsetID(streamName string) (int64, error) {
 	return safeOffsetID, nil
 }
 
+// deleteUntil deletes all messages in the stream before the given offsetID
 func (gc *gcWorker) deleteUntil(streamName string, offsetID int64) error {
 	stmt := fmt.Sprintf(`
 		DELETE FROM
@@ -77,6 +79,7 @@ func (gc *gcWorker) deleteUntil(streamName string, offsetID int64) error {
 	return nil
 }
 
+// safeGC deletes all messages in the stream before the last SAFE_AMOUNT messages
 func (gc *gcWorker) safeGC(streamName string) error {
 	safePoint, err := gc.getSafeOffsetID(streamName)
 	if err != nil {

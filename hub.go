@@ -23,6 +23,7 @@ import (
 	"github.com/c4pt0r/log"
 )
 
+// PollWorker is a worker that polls messages from a stream
 type PollWorker struct {
 	cfg              *Config
 	streamName       string
@@ -34,7 +35,8 @@ type PollWorker struct {
 	numSubscribers   int32
 
 	// make sure subscribers is threadsafe here
-	mu          sync.Mutex
+	mu sync.Mutex
+	// subscribers map[string]Subscriber, key is subscriber id
 	subscribers map[string]Subscriber
 }
 
@@ -93,6 +95,7 @@ func (pw *PollWorker) Stop() {
 func (pw *PollWorker) run() {
 	log.Info("sub: start polling from", pw.streamName, "@id=", pw.lastSeenOffset)
 	for !pw.stopped.Load().(bool) {
+		// get messages from the stream in batches
 		msgs, max, err := pw.store.FetchMessages(pw.streamName, pw.lastSeenOffset, pw.maxBatchSize)
 		if err != nil {
 			log.Error(err)
@@ -104,10 +107,11 @@ func (pw *PollWorker) run() {
 			log.Info("sub: got", len(msgs), "messages from", pw.streamName, "@ id=", pw.lastSeenOffset)
 
 			pw.mu.Lock()
+			// fanout to subscribers
 			for _, value := range pw.subscribers {
 				subscriber := value.(Subscriber)
 				log.Info("fanout to", subscriber.Id())
-				subscriber.OnMessages(pw.streamName, msgs)
+				go subscriber.OnMessages(pw.streamName, msgs)
 			}
 			pw.mu.Unlock()
 		}
