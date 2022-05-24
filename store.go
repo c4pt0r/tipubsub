@@ -17,6 +17,7 @@ package tipubsub
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -34,6 +35,8 @@ type Store interface {
 	MaxID(streamName string) (int64, error)
 	// StartGC starts the garbage collection worker
 	GC(streamName string) error
+	// DB returns the underlying database
+	DB() *sql.DB
 }
 
 func OpenStore(dsn string) (Store, error) {
@@ -90,6 +93,14 @@ func (s *TiDBStore) Init() error {
 	if err != nil {
 		return err
 	}
+
+	// default connection timeout setting
+	// application could customize it
+	// by using the value return of DB()
+	s.db.SetConnMaxLifetime(time.Minute * 3)
+	s.db.SetMaxOpenConns(50)
+	s.db.SetMaxIdleConns(50)
+
 	s.gc = newGCWorker(s.db)
 	return nil
 }
@@ -181,4 +192,8 @@ func (s *TiDBStore) MaxID(streamName string) (int64, error) {
 
 func (s *TiDBStore) GC(streamName string) error {
 	return s.gc.safeGC(streamName)
+}
+
+func (s *TiDBStore) DB() *sql.DB {
+	return s.db
 }

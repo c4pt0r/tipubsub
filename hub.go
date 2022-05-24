@@ -15,6 +15,7 @@
 package tipubsub
 
 import (
+	"database/sql"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -191,4 +192,8 @@ func (m *Hub) Unsubscribe(streamName string, subscriber Subscriber) {
 	if pw, ok := m.pollWorkers[streamName]; ok {
 		pw.removeSubscriber(subscriber)
 	}
+}
+
+func (m *Hub) DB() *sql.DB {
+	return m.store.DB()
 }
