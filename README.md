@@ -4,7 +4,7 @@ A small library using TiDB providing Sub/Pub API at sacle.
 
 Subscriber:
 
-```
+```Go
 type MySubscriber struct {}
 
 var _ pubsub.Subscriber = (*MySubscriber)(nil)
@@ -37,7 +37,7 @@ func main() {
 
 Publisher:
 
-```
+```Go
 func main() {
     ...
 	hub, err := pubsub.NewHub(cfg)
