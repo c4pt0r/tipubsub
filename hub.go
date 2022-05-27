@@ -74,16 +74,16 @@ func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*Poll
 func (pw *PollWorker) addNewSubscriber(subscriber Subscriber) {
 	pw.mu.Lock()
 	defer pw.mu.Unlock()
-	log.I("pollWorkers", pw.streamName, "got new subscriber:", subscriber.Id())
-	pw.subscribers[subscriber.Id()] = subscriber
+	log.I("pollWorkers", pw.streamName, "got new subscriber:", subscriber.ID())
+	pw.subscribers[subscriber.ID()] = subscriber
 	atomic.AddInt32(&pw.numSubscribers, 1)
 }
 
 func (pw *PollWorker) removeSubscriber(subscriber Subscriber) {
 	pw.mu.Lock()
 	defer pw.mu.Unlock()
-	log.I("pollWorkers", pw.streamName, "remove subscriber:", subscriber.Id())
-	delete(pw.subscribers, subscriber.Id())
+	log.I("pollWorkers", pw.streamName, "remove subscriber:", subscriber.ID())
+	delete(pw.subscribers, subscriber.ID())
 	atomic.AddInt32(&pw.numSubscribers, -1)
 }
 
@@ -110,7 +110,7 @@ func (pw *PollWorker) run() {
 			// fanout to subscribers
 			for _, value := range pw.subscribers {
 				subscriber := value.(Subscriber)
-				log.Info("fanout to", subscriber.Id())
+				log.Info("fanout to", subscriber.ID())
 				go subscriber.OnMessages(pw.streamName, msgs)
 			}
 			pw.mu.Unlock()

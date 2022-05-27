@@ -19,6 +19,6 @@ var (
 )
 
 type Subscriber interface {
-	Id() string
+	ID() string
 	OnMessages(streamName string, msgs []Message)
 }
