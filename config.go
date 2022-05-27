@@ -35,6 +35,12 @@ func (c *Config) String() string {
 	return fmt.Sprintf("%+v", *c)
 }
 
+func DefaultConfig() *Config {
+	var cfg Config
+	cleanenv.ReadEnv(&cfg)
+	return &cfg
+}
+
 // LoadConfig loads config from file.
 func LoadConfig(path string) (*Config, error) {
 	var cfg Config
