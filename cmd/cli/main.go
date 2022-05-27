@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"time"
 
 	"github.com/abiosoft/ishell"
@@ -18,8 +19,7 @@ var (
 )
 
 func pub(channel string, message string) {
-	fmt.Printf("pub %s %s\n", channel, message)
-	ts, err := hub.Publish(channel, &tipubsub.Message{
+	err := hub.Publish(channel, &tipubsub.Message{
 		Data: []byte(message),
 		Ts:   time.Now().Unix(),
 	})
@@ -27,7 +27,7 @@ func pub(channel string, message string) {
 		log.Error(err)
 		return
 	}
-	fmt.Printf("published %d\n", ts)
+	fmt.Println("OK")
 }
 
 type Subscriber struct {
@@ -78,7 +78,7 @@ func sub(channel string, offset int64) {
 	ch := s.getChannel()
 	log.Info("subscribed")
 	for m := range ch {
-		fmt.Printf("sub %s %s\n", channel, string(m.Data))
+		fmt.Printf("sub channel:%s val:%s offset=%d\n", channel, string(m.Data), m.ID)
 	}
 }
 
@@ -103,7 +103,11 @@ func main() {
 		Name: "pub",
 		Help: "pub <channel> <message>",
 		Func: func(c *ishell.Context) {
-			pub(c.Args[0], c.Args[1])
+			if len(c.Args) == 2 {
+				pub(c.Args[0], c.Args[1])
+			} else {
+				c.Println("usage: pub <channel> <message>")
+			}
 		},
 	})
 
@@ -111,7 +115,18 @@ func main() {
 		Name: "sub",
 		Help: "sub <channel> [offset]",
 		Func: func(c *ishell.Context) {
-			sub(c.Args[0], tipubsub.LatestId)
+			if len(c.Args) == 1 {
+				sub(c.Args[0], tipubsub.LatestId)
+			} else if len(c.Args) == 2 {
+				offset, err := strconv.ParseInt(c.Args[1], 10, 64)
+				if err != nil {
+					c.Println("usage: sub <channel> [offset]")
+					return
+				}
+				sub(c.Args[0], offset)
+			} else {
+				c.Println("usage: sub <channel> [offset]")
+			}
 		},
 	})
 

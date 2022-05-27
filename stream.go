@@ -66,12 +66,11 @@ func (s *Stream) Open() error {
 	return nil
 }
 
-func (s *Stream) Publish(m *Message) int64 {
+func (s *Stream) Publish(m *Message) {
 	if m.Ts == 0 {
 		m.Ts = time.Now().UnixNano()
 	}
 	s.mq <- m
-	return m.Ts
 }
 
 func (s *Stream) getBatches(maxItems int, maxTimeout time.Duration) chan []*Message {
