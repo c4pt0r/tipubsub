@@ -158,6 +158,14 @@ func (m *Hub) gc() {
 	}
 }
 
+func (m *Hub) ForceGC() {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for streamName := range m.streams {
+		m.store.GC(streamName)
+	}
+}
+
 func (m *Hub) Publish(streamName string, msg *Message) error {
 	m.mu.Lock()
 	if _, ok := m.streams[streamName]; !ok {

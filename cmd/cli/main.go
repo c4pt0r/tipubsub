@@ -130,6 +130,15 @@ func main() {
 		},
 	})
 
+	shell.AddCmd(&ishell.Cmd{
+		Name: "gc",
+		Help: "gc",
+		Func: func(c *ishell.Context) {
+			fmt.Println("start force gc...")
+			hub.ForceGC()
+		},
+	})
+
 	shell.Run()
 	shell.Close()
 }
