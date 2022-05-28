@@ -18,6 +18,15 @@ var (
 	logLevel = flag.String("l", "error", "log level")
 )
 
+func randomString(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
 func pub(channel string, message string) {
 	err := hub.Publish(channel, &tipubsub.Message{
 		Data: []byte(message),
@@ -55,15 +64,6 @@ func (s *Subscriber) getChannel() chan tipubsub.Message {
 
 func (s *Subscriber) ID() string {
 	return s.id
-}
-
-func randomString(n int) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }
 
 func sub(channel string, offset int64) {
