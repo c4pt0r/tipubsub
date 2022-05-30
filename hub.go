@@ -101,6 +101,14 @@ func (pw *PollWorker) addNewSubscriber(subscriber Subscriber, offset int64) erro
 	return nil
 }
 
+func (pw *PollWorker) Stat() map[string]interface{} {
+	return map[string]interface{}{
+		"last_poll_id":        pw.lastSeenOffset,
+		"poll_interval_in_ms": pw.pollIntervalInMs,
+		"poll_batch_size":     pw.maxBatchSize,
+	}
+}
+
 func (pw *PollWorker) removeSubscriber(subscriber Subscriber) {
 	pw.mu.Lock()
 	defer pw.mu.Unlock()
@@ -210,6 +218,15 @@ func (m *Hub) Publish(streamName string, msg *Message) error {
 
 func (m *Hub) MinMaxID(streamName string) (int64, int64, error) {
 	return m.store.MinMaxID(streamName)
+}
+
+func (m *Hub) PollStat(streamName string) map[string]interface{} {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if pw, ok := m.pollWorkers[streamName]; ok {
+		return pw.Stat()
+	}
+	return nil
 }
 
 func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offsetID int64) error {

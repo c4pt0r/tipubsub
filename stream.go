@@ -15,20 +15,21 @@
 package tipubsub
 
 import (
-	"fmt"
+	"encoding/json"
 	"time"
 
 	"github.com/c4pt0r/log"
 )
 
 type Message struct {
-	ID   int64 // auto generated
-	Ts   int64
-	Data []byte
+	ID   int64  `json:"id,string"`
+	Ts   int64  `json:"ts,string"`
+	Data string `json:"data"`
 }
 
 func (m Message) String() string {
-	return fmt.Sprintf("Message{ID: %d, Ts: %d, Data: %s}", m.ID, m.Ts, string(m.Data))
+	b, _ := json.Marshal(m)
+	return string(b)
 }
 
 type Stream struct {

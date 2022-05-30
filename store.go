@@ -164,7 +164,7 @@ func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) 
 	for rows.Next() {
 		var id int64
 		var ts int64
-		var data []byte
+		var data string
 		err := rows.Scan(&id, &ts, &data)
 		if err != nil {
 			return nil, 0, err

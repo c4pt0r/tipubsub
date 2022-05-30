@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/abiosoft/ishell"
@@ -21,6 +22,18 @@ var (
 	logLevel = flag.String("l", "error", "log level")
 )
 
+func printSimpleTable(keys []string, values []interface{}) {
+	maxLen := 0
+	for _, key := range keys {
+		if len(key) > maxLen {
+			maxLen = len(key)
+		}
+	}
+	for i, key := range keys {
+		fmt.Printf("%s%s\t%v\n", key, strings.Repeat(" ", maxLen-len(key)), values[i])
+	}
+}
+
 func randomString(n int) string {
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	b := make([]rune, n)
@@ -32,8 +45,8 @@ func randomString(n int) string {
 
 func pub(channel string, message string) {
 	err := hub.Publish(channel, &tipubsub.Message{
-		Data: []byte(message),
-		Ts:   time.Now().Unix(),
+		Data: message,
+		Ts:   time.Now().UnixNano(),
 	})
 	if err != nil {
 		log.Error(err)
@@ -73,8 +86,8 @@ func sub(channel string, offset int64) {
 	subName := fmt.Sprintf("sub-%s-%s", channel, randomString(5))
 	s := NewSubscriber(subName)
 	fmt.Printf("start listening: %s subscriber id: %s at: %d\n",
-		color.HiWhiteString(channel),
-		color.HiWhiteString(subName),
+		color.GreenString(channel),
+		color.GreenString(subName),
 		offset)
 	err := hub.Subscribe(channel, s, offset)
 	if err != nil {
@@ -89,9 +102,7 @@ func sub(channel string, offset int64) {
 		case <-c:
 			goto L
 		case m := <-ch:
-			fmt.Printf("new message, channel: %s val: %s id=%d\n",
-				color.HiWhiteString(channel),
-				color.HiWhiteString(string(m.Data)), m.ID)
+			fmt.Println(m)
 		}
 	}
 L:
@@ -175,9 +186,10 @@ func main() {
 					c.Println(err)
 					return
 				}
-				c.Printf("stream_name\t%s\n", streamName)
-				c.Printf("min_id\t%d\n", min)
-				c.Printf("max_id\t%d\n", max)
+				keys := []string{"stream_name", "min_id", "max_id"}
+				vals := []interface{}{streamName, min, max}
+				printSimpleTable(keys, vals)
+
 			} else {
 				fmt.Println("usage: stat <streamName>")
 			}
