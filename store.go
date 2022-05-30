@@ -153,6 +153,9 @@ func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) 
 
 	rows, err := s.db.Query(stmt, idOffset)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, 0, nil
+		}
 		return nil, 0, err
 	}
 	defer rows.Close()

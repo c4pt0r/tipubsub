@@ -76,12 +76,29 @@ func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*Poll
 	return pw, nil
 }
 
-func (pw *PollWorker) addNewSubscriber(subscriber Subscriber) {
+func (pw *PollWorker) addNewSubscriber(subscriber Subscriber, offset int64) error {
 	pw.mu.Lock()
 	defer pw.mu.Unlock()
 	log.I("pollWorkers", pw.streamName, "got new subscriber:", subscriber.ID())
+	// push [offset, max] to new subscriber
+	if offset != LatestId && offset < pw.lastSeenOffset {
+		for {
+			msgs, newOffset, err := pw.store.FetchMessages(pw.streamName, offset, pw.maxBatchSize)
+			if err != nil {
+				return err
+			}
+			if len(msgs) > 0 {
+				offset = newOffset
+				go subscriber.OnMessages(pw.streamName, msgs)
+			} else {
+				break
+			}
+		}
+	}
+	// listen to new messages
 	pw.subscribers[subscriber.ID()] = subscriber
 	atomic.AddInt32(&pw.numSubscribers, 1)
+	return nil
 }
 
 func (pw *PollWorker) removeSubscriber(subscriber Subscriber) {
@@ -207,8 +224,7 @@ func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offsetID int64
 		}
 		m.pollWorkers[streamName] = pw
 	}
-	m.pollWorkers[streamName].addNewSubscriber(subscriber)
-	return nil
+	return m.pollWorkers[streamName].addNewSubscriber(subscriber, offsetID)
 }
 
 func (m *Hub) Unsubscribe(streamName string, subscriber Subscriber) {

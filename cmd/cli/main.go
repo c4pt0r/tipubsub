@@ -72,9 +72,10 @@ func (s *Subscriber) ID() string {
 func sub(channel string, offset int64) {
 	subName := fmt.Sprintf("sub-%s-%s", channel, randomString(5))
 	s := NewSubscriber(subName)
-	fmt.Printf("start listening: %s subscriber id: %s\n",
+	fmt.Printf("start listening: %s subscriber id: %s at: %d\n",
 		color.HiWhiteString(channel),
-		color.HiWhiteString(subName))
+		color.HiWhiteString(subName),
+		offset)
 	err := hub.Subscribe(channel, s, offset)
 	if err != nil {
 		log.Error(err)
@@ -86,15 +87,16 @@ func sub(channel string, offset int64) {
 	for {
 		select {
 		case <-c:
-			hub.Unsubscribe(channel, s)
-			fmt.Printf("bye\n")
-			return
+			goto L
 		case m := <-ch:
 			fmt.Printf("new message, channel: %s val: %s id=%d\n",
 				color.HiWhiteString(channel),
 				color.HiWhiteString(string(m.Data)), m.ID)
 		}
 	}
+L:
+	hub.Unsubscribe(channel, s)
+	fmt.Printf("stop listening")
 }
 
 func main() {
