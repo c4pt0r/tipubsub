@@ -4,17 +4,20 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"os"
+	"os/signal"
 	"strconv"
 	"time"
 
 	"github.com/abiosoft/ishell"
 	"github.com/c4pt0r/log"
 	"github.com/c4pt0r/tipubsub"
+	"github.com/fatih/color"
 )
 
 var (
 	hub      *tipubsub.Hub
-	dsn      = flag.String("dsn", "", "TiDB DSN")
+	dsn      = flag.String("dsn", "root:@tcp(localhost:4000)/test", "TiDB DSN")
 	logLevel = flag.String("l", "error", "log level")
 )
 
@@ -67,18 +70,30 @@ func (s *Subscriber) ID() string {
 }
 
 func sub(channel string, offset int64) {
-	fmt.Printf("sub %s\n", channel)
-
-	s := NewSubscriber(fmt.Sprintf("sub-%s-%s", channel, randomString(5)))
+	subName := fmt.Sprintf("sub-%s-%s", channel, randomString(5))
+	s := NewSubscriber(subName)
+	fmt.Printf("start listening: %s subscriber id: %s\n",
+		color.HiWhiteString(channel),
+		color.HiWhiteString(subName))
 	err := hub.Subscribe(channel, s, offset)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 	ch := s.getChannel()
-	log.Info("subscribed")
-	for m := range ch {
-		fmt.Printf("sub channel:%s val:%s offset=%d\n", channel, string(m.Data), m.ID)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	for {
+		select {
+		case <-c:
+			hub.Unsubscribe(channel, s)
+			fmt.Printf("bye\n")
+			return
+		case m := <-ch:
+			fmt.Printf("new message, channel: %s val: %s id=%d\n",
+				color.HiWhiteString(channel),
+				color.HiWhiteString(string(m.Data)), m.ID)
+		}
 	}
 }
 
@@ -136,6 +151,34 @@ func main() {
 		Func: func(c *ishell.Context) {
 			fmt.Println("start force gc...")
 			hub.ForceGC()
+		},
+	})
+
+	shell.AddCmd(&ishell.Cmd{
+		Name: "exit",
+		Help: "exit",
+		Func: func(c *ishell.Context) {
+			c.Stop()
+		},
+	})
+
+	shell.AddCmd(&ishell.Cmd{
+		Name: "stat",
+		Help: "stat",
+		Func: func(c *ishell.Context) {
+			if len(c.Args) == 1 {
+				streamName := c.Args[0]
+				min, max, err := hub.MinMaxID(streamName)
+				if err != nil {
+					c.Println(err)
+					return
+				}
+				c.Printf("stream_name\t%s\n", streamName)
+				c.Printf("min_id\t%d\n", min)
+				c.Printf("max_id\t%d\n", max)
+			} else {
+				fmt.Println("usage: stat <streamName>")
+			}
 		},
 	})
 

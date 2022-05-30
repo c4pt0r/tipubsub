@@ -16,11 +16,16 @@ package tipubsub
 
 import (
 	"database/sql"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/c4pt0r/log"
+)
+
+var (
+	ErrStreamNotFound error = errors.New("stream not found")
 )
 
 // PollWorker is a worker that polls messages from a stream
@@ -48,7 +53,7 @@ func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*Poll
 	}
 
 	if offset == LatestId {
-		offset, err = s.MaxID(streamName)
+		_, offset, err = s.MinMaxID(streamName)
 		if err != nil {
 			return nil, err
 		}
@@ -184,6 +189,10 @@ func (m *Hub) Publish(streamName string, msg *Message) error {
 	m.mu.Unlock()
 	s.Publish(msg)
 	return nil
+}
+
+func (m *Hub) MinMaxID(streamName string) (int64, int64, error) {
+	return m.store.MinMaxID(streamName)
 }
 
 func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offsetID int64) error {

@@ -73,6 +73,10 @@ func (s *Stream) Publish(m *Message) {
 	s.mq <- m
 }
 
+func (s *Stream) MinMaxID() (int64, int64, error) {
+	return s.store.MinMaxID(s.name)
+}
+
 func (s *Stream) getBatches(maxItems int, maxTimeout time.Duration) chan []*Message {
 	// Create a channel to receive batches
 	batches := make(chan []*Message)
