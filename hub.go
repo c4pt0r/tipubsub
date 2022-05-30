@@ -69,7 +69,7 @@ func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*Poll
 		stopped:          stopped,
 		numSubscribers:   0,
 		mu:               sync.Mutex{},
-		pollIntervalInMs: cfg.PollIntervalInMs, // FIXME: use config
+		pollIntervalInMs: cfg.PollIntervalInMs,
 		subscribers:      map[string]Subscriber{},
 	}
 	go pw.run()

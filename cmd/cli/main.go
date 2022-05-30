@@ -96,7 +96,6 @@ func sub(channel string, offset int64) {
 	}
 L:
 	hub.Unsubscribe(channel, s)
-	fmt.Printf("stop listening")
 }
 
 func main() {
@@ -117,8 +116,8 @@ func main() {
 
 	// register commands
 	shell.AddCmd(&ishell.Cmd{
-		Name: "pub",
-		Help: "pub <channel> <message>",
+		Name: "publish",
+		Help: "publish <channel> <message>",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 2 {
 				pub(c.Args[0], c.Args[1])
@@ -129,20 +128,21 @@ func main() {
 	})
 
 	shell.AddCmd(&ishell.Cmd{
-		Name: "sub",
-		Help: "sub <channel> [offset]",
+		Name: "subscribe",
+		Help: "subscribe <channel> [offset]",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 1 {
 				sub(c.Args[0], tipubsub.LatestId)
 			} else if len(c.Args) == 2 {
 				offset, err := strconv.ParseInt(c.Args[1], 10, 64)
 				if err != nil {
-					c.Println("usage: sub <channel> [offset]")
+					c.Println("usage: subscribe <channel> [offset]")
 					return
 				}
 				sub(c.Args[0], offset)
+				c.Println("OK")
 			} else {
-				c.Println("usage: sub <channel> [offset]")
+				c.Println("usage: subscribe <channel> [offset]")
 			}
 		},
 	})
