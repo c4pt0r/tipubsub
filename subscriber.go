@@ -14,9 +14,20 @@
 
 package tipubsub
 
+import "strconv"
+
+type Offset int64
+
 var (
-	LatestId = int64(-1)
+	LatestId Offset = -1
 )
+
+func (o Offset) String() string {
+	if o == LatestId {
+		return "latest"
+	}
+	return strconv.FormatInt(int64(o), 10)
+}
 
 type Subscriber interface {
 	ID() string

@@ -30,7 +30,7 @@ type Store interface {
 	// PutMessages puts messages into a stream
 	PutMessages(streamName string, messages []*Message) error
 	// FetchMessages fetches messages from a stream
-	FetchMessages(streamName string, ts int64, limit int) ([]Message, int64, error)
+	FetchMessages(streamName string, offset Offset, limit int) ([]Message, Offset, error)
 	// MinMaxID returns the min, max offset of a stream
 	MinMaxID(streamName string) (int64, int64, error)
 	// StartGC starts the garbage collection worker
@@ -141,7 +141,7 @@ func (s *TiDBStore) PutMessages(streamName string, messages []*Message) error {
 	return nil
 }
 
-func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) ([]Message, int64, error) {
+func (s *TiDBStore) FetchMessages(streamName string, idOffset Offset, limit int) ([]Message, Offset, error) {
 	stmt := fmt.Sprintf(`
 		SELECT
 			id,
@@ -159,6 +159,7 @@ func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) 
 		return nil, 0, err
 	}
 	defer rows.Close()
+
 	var messages []Message
 	var maxId int64 = 0
 	for rows.Next() {
@@ -178,7 +179,7 @@ func (s *TiDBStore) FetchMessages(streamName string, idOffset int64, limit int) 
 			maxId = id
 		}
 	}
-	return messages, maxId, nil
+	return messages, Offset(maxId), nil
 }
 
 func (s *TiDBStore) MinMaxID(streamName string) (int64, int64, error) {

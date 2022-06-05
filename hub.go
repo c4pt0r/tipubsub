@@ -32,7 +32,7 @@ var (
 type PollWorker struct {
 	cfg              *Config
 	streamName       string
-	lastSeenOffset   int64
+	lastSeenOffset   Offset
 	maxBatchSize     int
 	store            Store
 	pollIntervalInMs int
@@ -45,7 +45,7 @@ type PollWorker struct {
 	subscribers map[string]Subscriber
 }
 
-func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*PollWorker, error) {
+func newPollWorker(cfg *Config, s Store, streamName string, offset Offset) (*PollWorker, error) {
 	// create stream table
 	err := s.CreateStream(streamName)
 	if err != nil {
@@ -53,10 +53,11 @@ func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*Poll
 	}
 
 	if offset == LatestId {
-		_, offset, err = s.MinMaxID(streamName)
+		_, offsetInt, err := s.MinMaxID(streamName)
 		if err != nil {
 			return nil, err
 		}
+		offset = Offset(offsetInt)
 	}
 	stopped := atomic.Value{}
 	stopped.Store(false)
@@ -76,19 +77,19 @@ func newPollWorker(cfg *Config, s Store, streamName string, offset int64) (*Poll
 	return pw, nil
 }
 
-func (pw *PollWorker) addNewSubscriber(subscriber Subscriber, offset int64) error {
+func (pw *PollWorker) addNewSubscriber(subscriber Subscriber, offset Offset) error {
 	pw.mu.Lock()
 	defer pw.mu.Unlock()
 	log.I("pollWorkers", pw.streamName, "got new subscriber:", subscriber.ID())
 	// push [offset, max] to new subscriber
 	if offset != LatestId && offset < pw.lastSeenOffset {
 		for {
-			msgs, newOffset, err := pw.store.FetchMessages(pw.streamName, offset, pw.maxBatchSize)
+			msgs, newOffsetInt, err := pw.store.FetchMessages(pw.streamName, offset, pw.maxBatchSize)
 			if err != nil {
 				return err
 			}
 			if len(msgs) > 0 {
-				offset = newOffset
+				offset = Offset(newOffsetInt)
 				go subscriber.OnMessages(pw.streamName, msgs)
 			} else {
 				break
@@ -133,7 +134,7 @@ func (pw *PollWorker) run() {
 			goto done
 		}
 		if len(msgs) > 0 {
-			pw.lastSeenOffset = max
+			pw.lastSeenOffset = Offset(max)
 			log.Info("sub: got", len(msgs), "messages from", pw.streamName, "@ id=", pw.lastSeenOffset)
 
 			pw.mu.Lock()
@@ -229,19 +230,19 @@ func (m *Hub) PollStat(streamName string) map[string]interface{} {
 	return nil
 }
 
-func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offsetID int64) error {
+func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offset Offset) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	// if the stream is not in the map, create a new poll worker for this stream
 	if _, ok := m.pollWorkers[streamName]; !ok {
 		// create a new poll worker for this stream
-		pw, err := newPollWorker(m.cfg, m.store, streamName, offsetID)
+		pw, err := newPollWorker(m.cfg, m.store, streamName, offset)
 		if err != nil {
 			return err
 		}
 		m.pollWorkers[streamName] = pw
 	}
-	return m.pollWorkers[streamName].addNewSubscriber(subscriber, offsetID)
+	return m.pollWorkers[streamName].addNewSubscriber(subscriber, offset)
 }
 
 func (m *Hub) Unsubscribe(streamName string, subscriber Subscriber) {

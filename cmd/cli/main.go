@@ -82,14 +82,14 @@ func (s *Subscriber) ID() string {
 	return s.id
 }
 
-func sub(channel string, offset int64) {
+func sub(channel string, offset tipubsub.Offset) {
 	subName := fmt.Sprintf("sub-%s-%s", channel, randomString(5))
 	s := NewSubscriber(subName)
-	fmt.Printf("start listening: %s subscriber id: %s at: %d\n",
+	fmt.Printf("start listening: %s subscriber id: %s at: %v\n",
 		color.GreenString(channel),
 		color.GreenString(subName),
 		offset)
-	err := hub.Subscribe(channel, s, offset)
+	err := hub.Subscribe(channel, s, tipubsub.Offset(offset))
 	if err != nil {
 		log.Error(err)
 		return
@@ -150,7 +150,7 @@ func main() {
 					c.Println("usage: subscribe <channel> [offset]")
 					return
 				}
-				sub(c.Args[0], offset)
+				sub(c.Args[0], tipubsub.Offset(offset))
 				c.Println("OK")
 			} else {
 				c.Println("usage: subscribe <channel> [offset]")
