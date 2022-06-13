@@ -41,7 +41,7 @@ func main() {
 	for {
 		for i := 0; i < 10000; i++ {
 			hub.Publish("test_stream", &tipubsub.Message{
-				Data: []byte(fmt.Sprintf("Message: %d", i)),
+				Data: fmt.Sprintf("Message: %d", i),
 			})
 		}
 		time.Sleep(1 * time.Second)

@@ -40,7 +40,7 @@ func (s *MySubscriber) OnMessages(streamName string, msgs []tipubsub.Message) {
 	}
 }
 
-func (s *MySubscriber) Id() string {
+func (s *MySubscriber) ID() string {
 	return "test_subscriber"
 }
 
@@ -49,15 +49,16 @@ func main() {
 	cfg := tipubsub.MustLoadConfig(*configFile)
 	log.Info("config:", cfg)
 
-	var offset int64
+	var offset tipubsub.Offset
 	var err error
 	if *offsetID == "HEAD" {
 		offset = tipubsub.LatestId
 	} else {
-		offset, err = strconv.ParseInt(*offsetID, 10, 64)
+		o, err := strconv.ParseInt(*offsetID, 10, 64)
 		if err != nil {
 			log.Fatal(err)
 		}
+		offset = tipubsub.Offset(o)
 	}
 	sub := &MySubscriber{}
 	hub, err := tipubsub.NewHub(cfg)
