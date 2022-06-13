@@ -159,6 +159,8 @@ type Hub struct {
 	// streamName -> Stream
 	streams map[string]*Stream
 	cfg     *Config
+
+	gcWorker *gcWorker
 }
 
 func NewHub(c *Config) (*Hub, error) {
@@ -183,7 +185,7 @@ func (m *Hub) gc() {
 		m.mu.RLock()
 		for streamName := range m.streams {
 			log.I("start GC", streamName)
-			m.store.GC(streamName)
+			m.gcWorker.safeGC(streamName)
 		}
 		m.mu.RUnlock()
 	}
@@ -193,7 +195,7 @@ func (m *Hub) ForceGC() {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for streamName := range m.streams {
-		m.store.GC(streamName)
+		m.gcWorker.safeGC(streamName)
 	}
 }
 

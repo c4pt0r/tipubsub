@@ -17,9 +17,10 @@ import (
 )
 
 var (
-	hub      *tipubsub.Hub
-	dsn      = flag.String("dsn", "root:@tcp(localhost:4000)/test", "TiDB DSN")
-	logLevel = flag.String("l", "error", "log level")
+	hub               *tipubsub.Hub
+	dsn               = flag.String("dsn", "root:@tcp(localhost:4000)/test", "TiDB DSN")
+	logLevel          = flag.String("l", "error", "log level")
+	PrintSampleConfig = flag.Bool("sample-config", false, "print sample config")
 )
 
 func printSimpleTable(keys []string, values []interface{}) {
@@ -111,6 +112,10 @@ L:
 
 func main() {
 	flag.Parse()
+	if *PrintSampleConfig {
+		tipubsub.PrintSampleConfig()
+		return
+	}
 	log.SetLevelByString(*logLevel)
 
 	cfg := tipubsub.DefaultConfig()

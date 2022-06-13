@@ -16,7 +16,9 @@ package tipubsub
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/BurntSushi/toml"
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -29,6 +31,8 @@ type Config struct {
 	PollIntervalInMs int `toml:"poll_interval_in_ms" env:"POLL_INTERVAL_IN_MS" env-default:"100"`
 	// GCIntervalInSec is the interval to run garbage collection.
 	GCIntervalInSec int `toml:"gc_interval_in_sec" env:"GC_INTERVAL_IN_SEC" env-default:"600"`
+	// GCKeepItems is the number of items to keep in the cache.
+	GCKeepItems int `toml:"gc_keep_items" env:"GC_KEEP_ITEMS" env-default:"10000"`
 }
 
 func (c *Config) String() string {
@@ -37,6 +41,8 @@ func (c *Config) String() string {
 
 func DefaultConfig() *Config {
 	var cfg Config
+	// read configuration from the file and environment variables
+	// or use default values if not set
 	cleanenv.ReadEnv(&cfg)
 	return &cfg
 }
@@ -63,4 +69,9 @@ func MustLoadConfig(path string) *Config {
 		panic(err)
 	}
 	return cfg
+}
+
+func PrintSampleConfig() {
+	cfg := DefaultConfig()
+	toml.NewEncoder(os.Stdout).Encode(cfg)
 }

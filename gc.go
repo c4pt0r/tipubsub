@@ -19,16 +19,12 @@ import (
 	"fmt"
 )
 
-const (
-	// always keep recent 1000 messages
-	SAFE_AMOUNT int = 1000
-)
-
 type gcWorker struct {
-	db *sql.DB
+	db  *sql.DB
+	cfg *Config
 }
 
-func newGCWorker(db *sql.DB) *gcWorker {
+func newGCWorker(db *sql.DB, config *Config) *gcWorker {
 	return &gcWorker{
 		db: db,
 	}
@@ -47,7 +43,7 @@ func (gc *gcWorker) getSafeOffsetID(streamName string) (int64, error) {
 					id
 				DESC LIMIT %d
 			) as t
-		`, getStreamTblName(streamName), SAFE_AMOUNT)
+		`, getStreamTblName(streamName), gc.cfg.GCKeepItems)
 
 	var safeOffsetID int64
 	err := gc.db.QueryRow(stmt).Scan(&safeOffsetID)
