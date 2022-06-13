@@ -28,8 +28,3 @@ func (o Offset) String() string {
 	}
 	return strconv.FormatInt(int64(o), 10)
 }
-
-type Subscriber interface {
-	ID() string
-	OnMessages(streamName string, msgs []Message)
-}

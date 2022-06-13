@@ -19,6 +19,7 @@ import (
 	"sync"
 )
 
+// NOT yet implemented, just a placeholder
 type Stat struct {
 	mu sync.RWMutex
 	m  map[string]interface{}

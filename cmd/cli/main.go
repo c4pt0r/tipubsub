@@ -56,46 +56,25 @@ func pub(channel string, message string) {
 	fmt.Println("OK")
 }
 
-type Subscriber struct {
-	id string
-	ch chan tipubsub.Message
-}
-
-func NewSubscriber(id string) *Subscriber {
-	return &Subscriber{
-		id: id,
-		ch: make(chan tipubsub.Message),
-	}
-}
-
-func (s *Subscriber) OnMessages(channelName string, messages []tipubsub.Message) {
-	log.Info("on message", messages)
-	for _, m := range messages {
-		s.ch <- m
-	}
-}
-
-func (s *Subscriber) getChannel() chan tipubsub.Message {
-	return s.ch
-}
-
-func (s *Subscriber) ID() string {
-	return s.id
-}
-
 func sub(channel string, offset tipubsub.Offset) {
 	subName := fmt.Sprintf("sub-%s-%s", channel, randomString(5))
-	s := NewSubscriber(subName)
 	fmt.Printf("start listening: %s subscriber id: %s at: %v\n",
 		color.GreenString(channel),
 		color.GreenString(subName),
 		offset)
-	err := hub.Subscribe(channel, s, tipubsub.Offset(offset))
+	msgs, err := hub.MessagesSinceOffset(channel, offset)
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	ch := s.getChannel()
+	for _, msg := range msgs {
+		fmt.Println(msg)
+	}
+	ch, err := hub.Subscribe(channel, subName)
+	if err != nil {
+		log.Error(err)
+		return
+	}
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	for {
@@ -107,7 +86,7 @@ func sub(channel string, offset tipubsub.Offset) {
 		}
 	}
 L:
-	hub.Unsubscribe(channel, s)
+	hub.Unsubscribe(channel, subName)
 }
 
 func main() {

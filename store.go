@@ -22,6 +22,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// Store is the interface for the storage of the messages
 type Store interface {
 	// Init initializes the store, call it after creating the store
 	Init() error
@@ -38,7 +39,6 @@ type Store interface {
 }
 
 func OpenStore(dsn string) (Store, error) {
-	// TODO only support TiDB now
 	s := NewTiDBStore(dsn)
 	if err := s.Init(); err != nil {
 		return nil, err

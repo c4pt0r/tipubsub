@@ -18,7 +18,6 @@ import (
 	"database/sql"
 	"errors"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/c4pt0r/log"
@@ -27,130 +26,6 @@ import (
 var (
 	ErrStreamNotFound error = errors.New("stream not found")
 )
-
-// PollWorker is a worker that polls messages from a stream
-type PollWorker struct {
-	cfg              *Config
-	streamName       string
-	lastSeenOffset   Offset
-	maxBatchSize     int
-	store            Store
-	pollIntervalInMs int
-	stopped          atomic.Value
-	numSubscribers   int32
-
-	// make sure subscribers is threadsafe here
-	mu sync.Mutex
-	// subscribers map[string]Subscriber, key is subscriber id
-	subscribers map[string]Subscriber
-}
-
-func newPollWorker(cfg *Config, s Store, streamName string, offset Offset) (*PollWorker, error) {
-	// create stream table
-	err := s.CreateStream(streamName)
-	if err != nil {
-		return nil, err
-	}
-
-	if offset == LatestId {
-		_, offsetInt, err := s.MinMaxID(streamName)
-		if err != nil {
-			return nil, err
-		}
-		offset = Offset(offsetInt)
-	}
-	stopped := atomic.Value{}
-	stopped.Store(false)
-
-	pw := &PollWorker{
-		streamName:       streamName,
-		lastSeenOffset:   offset,
-		maxBatchSize:     cfg.MaxBatchSize,
-		store:            s,
-		stopped:          stopped,
-		numSubscribers:   0,
-		mu:               sync.Mutex{},
-		pollIntervalInMs: cfg.PollIntervalInMs,
-		subscribers:      map[string]Subscriber{},
-	}
-	go pw.run()
-	return pw, nil
-}
-
-func (pw *PollWorker) addNewSubscriber(subscriber Subscriber, offset Offset) error {
-	pw.mu.Lock()
-	defer pw.mu.Unlock()
-	log.I("pollWorkers", pw.streamName, "got new subscriber:", subscriber.ID())
-	// push [offset, max] to new subscriber
-	if offset != LatestId && offset < pw.lastSeenOffset {
-		for {
-			msgs, newOffsetInt, err := pw.store.FetchMessages(pw.streamName, offset, pw.maxBatchSize)
-			if err != nil {
-				return err
-			}
-			if len(msgs) > 0 {
-				offset = Offset(newOffsetInt)
-				go subscriber.OnMessages(pw.streamName, msgs)
-			} else {
-				break
-			}
-		}
-	}
-	// listen to new messages
-	pw.subscribers[subscriber.ID()] = subscriber
-	atomic.AddInt32(&pw.numSubscribers, 1)
-	return nil
-}
-
-func (pw *PollWorker) Stat() map[string]interface{} {
-	return map[string]interface{}{
-		"last_poll_id":        pw.lastSeenOffset,
-		"poll_interval_in_ms": pw.pollIntervalInMs,
-		"poll_batch_size":     pw.maxBatchSize,
-	}
-}
-
-func (pw *PollWorker) removeSubscriber(subscriber Subscriber) {
-	pw.mu.Lock()
-	defer pw.mu.Unlock()
-	log.I("pollWorkers", pw.streamName, "remove subscriber:", subscriber.ID())
-	delete(pw.subscribers, subscriber.ID())
-	atomic.AddInt32(&pw.numSubscribers, -1)
-}
-
-func (pw *PollWorker) Stop() {
-	log.I("pollWorkers", pw.streamName, "stopped")
-	pw.stopped.Store(true)
-}
-
-func (pw *PollWorker) run() {
-	log.Info("sub: start polling from", pw.streamName, "@id=", pw.lastSeenOffset)
-	for !pw.stopped.Load().(bool) {
-		// get messages from the stream in batches
-		msgs, max, err := pw.store.FetchMessages(pw.streamName, pw.lastSeenOffset, pw.maxBatchSize)
-		if err != nil {
-			log.Error(err)
-			time.Sleep(time.Duration(pw.pollIntervalInMs) * time.Millisecond)
-			goto done
-		}
-		if len(msgs) > 0 {
-			pw.lastSeenOffset = Offset(max)
-			log.Info("sub: got", len(msgs), "messages from", pw.streamName, "@ id=", pw.lastSeenOffset)
-
-			pw.mu.Lock()
-			// fanout to subscribers
-			for _, value := range pw.subscribers {
-				subscriber := value.(Subscriber)
-				log.Info("fanout to", subscriber.ID())
-				go subscriber.OnMessages(pw.streamName, msgs)
-			}
-			pw.mu.Unlock()
-		}
-	done:
-		time.Sleep(time.Duration(pw.pollIntervalInMs) * time.Millisecond)
-	}
-	log.D("poll worker stopped")
-}
 
 type Hub struct {
 	mu          sync.RWMutex
@@ -174,6 +49,7 @@ func NewHub(c *Config) (*Hub, error) {
 		store:       store,
 		pollWorkers: map[string]*PollWorker{},
 		streams:     map[string]*Stream{},
+		gcWorker:    newGCWorker(store.DB(), c),
 	}
 	go h.gc()
 	return h, nil
@@ -232,26 +108,43 @@ func (m *Hub) PollStat(streamName string) map[string]interface{} {
 	return nil
 }
 
-func (m *Hub) Subscribe(streamName string, subscriber Subscriber, offset Offset) error {
+func (m *Hub) MessagesSinceOffset(streamName string, offset Offset) ([]Message, error) {
+	var ret []Message
+	for {
+		msgs, newOffsetInt, err := m.store.FetchMessages(streamName, offset, m.cfg.MaxBatchSize)
+		if err != nil {
+			return nil, err
+		}
+		if len(msgs) > 0 {
+			offset = Offset(newOffsetInt)
+			ret = append(ret, msgs...)
+		} else {
+			break
+		}
+	}
+	return ret, nil
+}
+
+func (m *Hub) Subscribe(streamName string, subscriberID string) (<-chan Message, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	// if the stream is not in the map, create a new poll worker for this stream
 	if _, ok := m.pollWorkers[streamName]; !ok {
 		// create a new poll worker for this stream
-		pw, err := newPollWorker(m.cfg, m.store, streamName, offset)
+		pw, err := newPollWorker(m.cfg, m.store, streamName)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		m.pollWorkers[streamName] = pw
 	}
-	return m.pollWorkers[streamName].addNewSubscriber(subscriber, offset)
+	return m.pollWorkers[streamName].addNewSubscriber(subscriberID)
 }
 
-func (m *Hub) Unsubscribe(streamName string, subscriber Subscriber) {
+func (m *Hub) Unsubscribe(streamName string, subscriberID string) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if pw, ok := m.pollWorkers[streamName]; ok {
-		pw.removeSubscriber(subscriber)
+		pw.removeSubscriber(subscriberID)
 	}
 }
 
