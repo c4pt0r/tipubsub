@@ -142,12 +142,7 @@ func (pw *PollWorker) run() {
 			for _, c := range pw.subscribers {
 				go func(ch chan Message) {
 					for _, msg := range msgs {
-						select {
-						case ch <- msg:
-						default:
-							log.Warn("sub: subscriber", c, "is full, dropping message")
-							break
-						}
+						ch <- msg
 					}
 				}(c)
 			}

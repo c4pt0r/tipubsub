@@ -17,6 +17,8 @@ package tipubsub
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/c4pt0r/log"
 )
 
 type gcWorker struct {
@@ -26,7 +28,8 @@ type gcWorker struct {
 
 func newGCWorker(db *sql.DB, config *Config) *gcWorker {
 	return &gcWorker{
-		db: db,
+		db:  db,
+		cfg: config,
 	}
 }
 
@@ -60,8 +63,8 @@ func (gc *gcWorker) deleteUntil(streamName string, offsetID int64) error {
 			%s
 		WHERE
 			id < ?
-		LIMIT 1000
-	`, getStreamTblName(streamName)) // TODO: batch size
+		LIMIT %d
+	`, getStreamTblName(streamName), gc.cfg.MaxBatchSize) // TODO: batch size
 	for {
 		res, err := gc.db.Exec(stmt, offsetID)
 		if err != nil {
@@ -71,6 +74,7 @@ func (gc *gcWorker) deleteUntil(streamName string, offsetID int64) error {
 		if affectedRows == 0 {
 			break
 		}
+		log.D("GC", "Deleted %d messages", affectedRows)
 	}
 	return nil
 }

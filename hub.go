@@ -59,6 +59,7 @@ func (m *Hub) gc() {
 	for {
 		time.Sleep(time.Duration(m.cfg.GCIntervalInSec) * time.Second)
 		m.mu.RLock()
+		// TODO: Should use all stream names(global), not just the ones in the map.
 		for streamName := range m.streams {
 			log.I("start GC", streamName)
 			m.gcWorker.safeGC(streamName)
@@ -67,12 +68,10 @@ func (m *Hub) gc() {
 	}
 }
 
-func (m *Hub) ForceGC() {
+func (m *Hub) ForceGC(streamName string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	for streamName := range m.streams {
-		m.gcWorker.safeGC(streamName)
-	}
+	return m.gcWorker.safeGC(streamName)
 }
 
 func (m *Hub) Publish(streamName string, msg *Message) error {

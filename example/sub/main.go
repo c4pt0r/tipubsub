@@ -29,21 +29,6 @@ var (
 	streamName = flag.String("s", "test_stream", "stream name")
 )
 
-type MySubscriber struct {
-}
-
-var _ tipubsub.Subscriber = (*MySubscriber)(nil)
-
-func (s *MySubscriber) OnMessages(streamName string, msgs []tipubsub.Message) {
-	for _, msg := range msgs {
-		log.E("Got Message:", msg, msg.ID)
-	}
-}
-
-func (s *MySubscriber) ID() string {
-	return "test_subscriber"
-}
-
 func main() {
 	flag.Parse()
 	cfg := tipubsub.MustLoadConfig(*configFile)
@@ -60,14 +45,22 @@ func main() {
 		}
 		offset = tipubsub.Offset(o)
 	}
-	sub := &MySubscriber{}
 	hub, err := tipubsub.NewHub(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = hub.Subscribe(*streamName, sub, offset)
+	ch, err := hub.Subscribe(*streamName, "subscriber1")
 	if err != nil {
 		log.Fatal(err)
 	}
-	<-make(chan struct{})
+	msgs, err := hub.MessagesSinceOffset(*streamName, offset)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, msg := range msgs {
+		log.Info("msg:", msg)
+	}
+	for msg := range ch {
+		log.Info("msg:", msg)
+	}
 }

@@ -147,7 +147,14 @@ func main() {
 		Help: "gc",
 		Func: func(c *ishell.Context) {
 			fmt.Println("start force gc...")
-			hub.ForceGC()
+			if len(c.Args) != 1 {
+				c.Println("usage: gc <channel>")
+				return
+			}
+			err := hub.ForceGC(c.Args[0])
+			if err != nil {
+				c.Println(err)
+			}
 		},
 	})
 
