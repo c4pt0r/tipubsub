@@ -62,13 +62,15 @@ func sub(channel string, offset tipubsub.Offset) {
 		color.GreenString(channel),
 		color.GreenString(subName),
 		offset)
-	msgs, err := hub.MessagesSinceOffset(channel, offset)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	for _, msg := range msgs {
-		fmt.Println(msg)
+	if offset != tipubsub.LatestId {
+		msgs, err := hub.MessagesSinceOffset(channel, offset)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		for _, msg := range msgs {
+			fmt.Println(msg)
+		}
 	}
 	ch, err := hub.Subscribe(channel, subName)
 	if err != nil {
@@ -154,6 +156,21 @@ func main() {
 			err := hub.ForceGC(c.Args[0])
 			if err != nil {
 				c.Println(err)
+			}
+		},
+	})
+
+	shell.AddCmd(&ishell.Cmd{
+		Name: "ls",
+		Help: "list all stream names",
+		Func: func(c *ishell.Context) {
+			names, err := hub.GetStreamNames()
+			if err != nil {
+				c.Println(err)
+				return
+			}
+			for _, name := range names {
+				c.Println(name)
 			}
 		},
 	})

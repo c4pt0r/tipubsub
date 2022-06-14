@@ -110,6 +110,7 @@ func (m *Hub) PollStat(streamName string) map[string]interface{} {
 func (m *Hub) MessagesSinceOffset(streamName string, offset Offset) ([]Message, error) {
 	var ret []Message
 	for {
+		log.I("start MessagesSinceOffset", streamName, offset)
 		msgs, newOffsetInt, err := m.store.FetchMessages(streamName, offset, m.cfg.MaxBatchSize)
 		if err != nil {
 			return nil, err
@@ -149,4 +150,10 @@ func (m *Hub) Unsubscribe(streamName string, subscriberID string) {
 
 func (m *Hub) DB() *sql.DB {
 	return m.store.DB()
+}
+
+func (m *Hub) GetStreamNames() ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.store.GetStreamNames()
 }

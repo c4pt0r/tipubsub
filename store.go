@@ -34,6 +34,8 @@ type Store interface {
 	FetchMessages(streamName string, offset Offset, limit int) ([]Message, Offset, error)
 	// MinMaxID returns the min, max offset of a stream
 	MinMaxID(streamName string) (int64, int64, error)
+	// GetStreamNames returns the names of all streams
+	GetStreamNames() ([]string, error)
 	// DB returns the underlying database
 	DB() *sql.DB
 }
@@ -65,9 +67,26 @@ func NewTiDBStore(dsn string) *TiDBStore {
 	}
 }
 
+func (s *TiDBStore) GetStreamNames() ([]string, error) {
+	var names []string
+	rows, err := s.db.Query("SELECT stream_name FROM tipubsub_meta")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		err := rows.Scan(&name)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, nil
+}
+
 // CreateStream creates a stream, every stream is a table in the database
 func (s *TiDBStore) CreateStream(streamName string) error {
-	// TODO: Use partition
 	// stream is a table in the database
 	stmt := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
@@ -79,6 +98,14 @@ func (s *TiDBStore) CreateStream(streamName string) error {
 			KEY(ts)
 		);`, getStreamTblName(streamName))
 	_, err := s.db.Exec(stmt)
+	if err != nil {
+		return err
+	}
+	// insert the stream name into the meta table
+	stmt = fmt.Sprintf(`
+		REPLACE INTO tipubsub_meta (stream_name)
+		VALUES ('%s');`, streamName)
+	_, err = s.db.Exec(stmt)
 	if err != nil {
 		return err
 	}
@@ -98,6 +125,16 @@ func (s *TiDBStore) Init() error {
 	s.db.SetConnMaxLifetime(time.Minute * 3)
 	s.db.SetMaxOpenConns(50)
 	s.db.SetMaxIdleConns(50)
+
+	// create stream meta table for all the streams
+	stmt := fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS tipubsub_meta (
+			stream_name VARCHAR(255) NOT NULL UNIQUE KEY
+		);`)
+	_, err = s.db.Exec(stmt)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -138,6 +175,13 @@ func (s *TiDBStore) PutMessages(streamName string, messages []*Message) error {
 }
 
 func (s *TiDBStore) FetchMessages(streamName string, idOffset Offset, limit int) ([]Message, Offset, error) {
+	if idOffset == LatestId {
+		_, maxOffset, err := s.MinMaxID(streamName)
+		if err != nil {
+			return nil, 0, err
+		}
+		idOffset = Offset(maxOffset)
+	}
 	stmt := fmt.Sprintf(`
 		SELECT
 			id,
