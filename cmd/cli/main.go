@@ -209,6 +209,7 @@ func main() {
 		},
 	})
 
+	fmt.Println(shell.HelpText())
 	shell.Run()
 	shell.Close()
 }
