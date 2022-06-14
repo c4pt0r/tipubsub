@@ -44,8 +44,8 @@ func randomString(n int) string {
 	return string(b)
 }
 
-func pub(channel string, message string) {
-	err := hub.Publish(channel, &tipubsub.Message{
+func pub(streamName string, message string) {
+	err := hub.Publish(streamName, &tipubsub.Message{
 		Data: message,
 		Ts:   time.Now().UnixNano(),
 	})
@@ -56,14 +56,14 @@ func pub(channel string, message string) {
 	fmt.Println("OK")
 }
 
-func sub(channel string, offset tipubsub.Offset) {
-	subName := fmt.Sprintf("sub-%s-%s", channel, randomString(5))
+func sub(streamName string, offset tipubsub.Offset) {
+	subName := fmt.Sprintf("sub-%s-%s", streamName, randomString(5))
 	fmt.Printf("start listening: %s subscriber id: %s at: %v\n",
-		color.GreenString(channel),
+		color.GreenString(streamName),
 		color.GreenString(subName),
 		offset)
 	if offset != tipubsub.LatestId {
-		msgs, err := hub.MessagesSinceOffset(channel, offset)
+		msgs, err := hub.MessagesSinceOffset(streamName, offset)
 		if err != nil {
 			log.Error(err)
 			return
@@ -72,7 +72,7 @@ func sub(channel string, offset tipubsub.Offset) {
 			fmt.Println(msg)
 		}
 	}
-	ch, err := hub.Subscribe(channel, subName)
+	ch, err := hub.Subscribe(streamName, subName)
 	if err != nil {
 		log.Error(err)
 		return
@@ -88,7 +88,7 @@ func sub(channel string, offset tipubsub.Offset) {
 		}
 	}
 L:
-	hub.Unsubscribe(channel, subName)
+	hub.Unsubscribe(streamName, subName)
 }
 
 func main() {
@@ -113,33 +113,35 @@ func main() {
 
 	// register commands
 	shell.AddCmd(&ishell.Cmd{
-		Name: "publish",
-		Help: "publish <channel> <message>",
+		Name:    "publish",
+		Aliases: []string{"pub", "p", "push", "send"},
+		Help:    "publish|pub|send|push|p <streamName> <message>",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 2 {
 				pub(c.Args[0], c.Args[1])
 			} else {
-				c.Println("usage: pub <channel> <message>")
+				c.Println("usage: pub <streamName> <message>")
 			}
 		},
 	})
 
 	shell.AddCmd(&ishell.Cmd{
-		Name: "subscribe",
-		Help: "subscribe <channel> [offset]",
+		Name:    "subscribe",
+		Aliases: []string{"sub", "watch", "listen", "l"},
+		Help:    "subscribe|sub|watch|listen|l  <streamName> [offset]",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 1 {
 				sub(c.Args[0], tipubsub.LatestId)
 			} else if len(c.Args) == 2 {
 				offset, err := strconv.ParseInt(c.Args[1], 10, 64)
 				if err != nil {
-					c.Println("usage: subscribe <channel> [offset]")
+					c.Println("usage: subscribe <streamName> [offset]")
 					return
 				}
 				sub(c.Args[0], tipubsub.Offset(offset))
 				c.Println("OK")
 			} else {
-				c.Println("usage: subscribe <channel> [offset]")
+				c.Println("usage: subscribe <streamName> [offset]")
 			}
 		},
 	})
@@ -150,7 +152,7 @@ func main() {
 		Func: func(c *ishell.Context) {
 			fmt.Println("start force gc...")
 			if len(c.Args) != 1 {
-				c.Println("usage: gc <channel>")
+				c.Println("usage: gc <streamName>")
 				return
 			}
 			err := hub.ForceGC(c.Args[0])
@@ -161,8 +163,9 @@ func main() {
 	})
 
 	shell.AddCmd(&ishell.Cmd{
-		Name: "ls",
-		Help: "list all stream names",
+		Name:    "ls",
+		Aliases: []string{"list"},
+		Help:    "list all stream names",
 		Func: func(c *ishell.Context) {
 			names, err := hub.GetStreamNames()
 			if err != nil {
@@ -176,16 +179,18 @@ func main() {
 	})
 
 	shell.AddCmd(&ishell.Cmd{
-		Name: "exit",
-		Help: "exit",
+		Name:    "exit",
+		Aliases: []string{"quit"},
+		Help:    "exit",
 		Func: func(c *ishell.Context) {
 			c.Stop()
 		},
 	})
 
 	shell.AddCmd(&ishell.Cmd{
-		Name: "stat",
-		Help: "stat",
+		Name:    "stat",
+		Aliases: []string{"stats", "info"},
+		Help:    "stat",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 1 {
 				streamName := c.Args[0]
